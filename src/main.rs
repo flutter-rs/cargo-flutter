@@ -58,9 +58,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .expect("cargo-args to not be null")
         .collect();
 
-    let path = download(config.version, target.to_string())?;
+    let engine_path = download(config.version, target.to_string())?;
 
-    let status = run(cargo_config.cwd(), target, cargo_args);
+    let status = run(cargo_config.cwd(), target, cargo_args, &engine_path);
 
     exit(status.code().unwrap_or(-1));
 }
@@ -113,9 +113,10 @@ fn download(_version: Option<String>, target: String) -> Result<PathBuf, Box<dyn
     Ok(engine_path)
 }
 
-fn run(dir: &Path, triple: &str, cargo_args: Vec<&str>) -> ExitStatus {
+fn run(dir: &Path, triple: &str, cargo_args: Vec<&str>, engine_path: &Path) -> ExitStatus {
     Command::new("cargo")
         .current_dir(dir)
+        .env("RUSTFLAGS", format!("-Clink-arg=-L{}", engine_path.parent().unwrap().display()))
         .args(cargo_args)
         .arg("--target")
         .arg(&triple)
