@@ -1,13 +1,14 @@
 use cargo::core::Workspace;
 use cargo::util::important_paths::find_root_manifest_for_wd;
 use cargo::util::Config;
+use cargo_flutter::EngineInfo;
 use clap::{App, AppSettings, Arg, SubCommand};
 use failure::format_err;
 use serde::Deserialize;
-use std::{env, fs, str};
 use std::error::Error;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{exit, Command, ExitStatus};
+use std::{env, fs, str};
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
@@ -47,19 +48,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     let cargo_config = Config::default()?;
     let root_manifest = find_root_manifest_for_wd(cargo_config.cwd())?;
     let workspace = Workspace::new(&root_manifest, &cargo_config)?;
+    // TODO -p flag
     let config = load_config(&workspace, None)?;
 
     let rustc = cargo_config.load_global_rustc(Some(&workspace))?;
-    let triple = matches.value_of("target").unwrap_or(rustc.host.as_str());
+    let target = matches.value_of("target").unwrap_or(rustc.host.as_str());
     let cargo_args: Vec<&str> = matches
         .values_of("cargo-args")
         .expect("cargo-args to not be null")
         .collect();
 
-    log::debug!("Target triple is {}", triple);
-    log::debug!("Requested flutter version is {:?}", config.version);
+    let path = download(config.version, target.to_string())?;
 
-    let status = run(&env::current_dir().unwrap(), triple, cargo_args);
+    let status = run(cargo_config.cwd(), target, cargo_args);
 
     exit(status.code().unwrap_or(-1));
 }
@@ -72,7 +73,12 @@ fn load_config(
         workspace
             .members()
             .find(|pkg| pkg.name().as_str() == package.as_str())
-            .ok_or_else(|| format_err!("package `{}` is not a member of the workspace", package.as_str()))?
+            .ok_or_else(|| {
+                format_err!(
+                    "package `{}` is not a member of the workspace",
+                    package.as_str()
+                )
+            })?
     } else {
         workspace.current()?
     };
@@ -87,6 +93,24 @@ fn load_config(
         .flutter
         .unwrap_or_default();
     Ok(flutter)
+}
+
+fn download(_version: Option<String>, target: String) -> Result<PathBuf, Box<dyn Error>> {
+    let version = cargo_flutter::get_flutter_version()?;
+    log::debug!("Engine version is {:?}", version);
+
+    let info = EngineInfo::new(version, target);
+    println!("Checking flutter engine status");
+
+    if let Ok(tx) = info.download() {
+        for (total, done) in tx.iter() {
+            println!("Downloading flutter engine {} of {}", done, total);
+        }
+    }
+
+    let engine_path = info.engine_path();
+    log::debug!("Engine path is {:?}", engine_path);
+    Ok(engine_path)
 }
 
 fn run(dir: &Path, triple: &str, cargo_args: Vec<&str>) -> ExitStatus {

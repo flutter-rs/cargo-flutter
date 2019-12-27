@@ -7,8 +7,11 @@ edition = "2018"
 [dependencies]
 cargo = "0.41.0"
 clap = "2.33.0"
+curl = { version = "0.4.25", features = ["http2"] }
+dirs = "2.0.2"
 env_logger = "0.7.1"
 failure = "0.1.6"
 log = "0.4.8"
 serde = { version = "1.0.104", features = ["derive"] }
 toml = "0.5.5"
+unzip = "0.1.0"
