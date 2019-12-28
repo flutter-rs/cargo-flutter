@@ -43,6 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .expect("cargo-args to not be null")
         .collect();
 
+    let cmd = cargo_args.iter().next().expect("Expected command");
     let target = get_arg(&cargo_args, |f| f == "--target");
     let package = get_arg(&cargo_args, |f| f == "--package" || f == "-p");
 
@@ -60,7 +61,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let engine_path = download(version, target)?;
 
-    let status = run(&cargo_config, &cargo_args, &engine_path);
+    if *cmd == "run" {
+        println!("flutter build bundle");
+        run_bundle(&workspace);
+    }
+
+    let status = run_cargo(&workspace, &cargo_args, &engine_path);
+
+    /*if *cmd == "run" {
+        run_attach(&workspace, "");
+    }*/
 
     exit(status.code().unwrap_or(-1));
 }
@@ -99,10 +109,9 @@ fn load_config(
 }
 
 fn download(version: String, target: String) -> Result<PathBuf, Box<dyn Error>> {
-    log::debug!("Engine version is {:?}", version);
+    log::info!("Using engine version {:?}", version);
 
     let info = EngineInfo::new(version, target);
-    println!("Checking flutter engine status");
 
     if let Ok(tx) = info.download() {
         for (total, done) in tx.iter() {
@@ -111,21 +120,49 @@ fn download(version: String, target: String) -> Result<PathBuf, Box<dyn Error>> 
     }
 
     let engine_path = info.engine_path();
-    log::debug!("Engine path is {:?}", engine_path);
+    log::info!("Using engine from {:?}", engine_path);
     Ok(engine_path)
 }
 
-fn run(cargo_config: &Config, cargo_args: &[&str], engine_path: &Path) -> ExitStatus {
+fn run_bundle(workspace: &Workspace) -> ExitStatus {
+    let target_dir = workspace.target_dir().into_path_unlocked();
+
+    Command::new("flutter")
+        .current_dir(workspace.root())
+        .arg("build")
+        .arg("bundle")
+        .arg("--track-widget-creation")
+        .arg("--asset-dir")
+        .arg(target_dir.join("flutter_assets"))
+        .arg("--depfile")
+        .arg(target_dir.join("snapshot_blob.bin.d"))
+        .status()
+        .expect("flutter build bundle")
+}
+
+fn run_cargo(workspace: &Workspace, cargo_args: &[&str], engine_path: &Path) -> ExitStatus {
+    let target_dir = workspace.target_dir().into_path_unlocked();
+    let rustflags = format!("-Clink-arg=-L{}", engine_path.parent().unwrap().display());
     Command::new("cargo")
-        .current_dir(cargo_config.cwd())
-        .env(
-            "RUSTFLAGS",
-            format!("-Clink-arg=-L{}", engine_path.parent().unwrap().display()),
-        )
+        .current_dir(workspace.config().cwd())
+        .env("RUSTFLAGS", rustflags)
         .args(cargo_args)
+        .arg("--target-dir")
+        .arg(target_dir.join("flutter"))
         .status()
         .expect("Success")
 }
+
+/*fn run_attach(workspace: &Workspace, debug_uri: &str) -> ExitStatus {
+    let debug_uri = format!("--debug-uri={}", debug_uri);
+    Command::new("flutter")
+        .current_dir(workspace.root())
+        .arg("attach")
+        .arg("--device-id=flutter-tester")
+        .arg(debug_uri)
+        .status()
+        .expect("Success")
+}*/
 
 #[derive(Debug, Clone, Deserialize)]
 struct TomlConfig {

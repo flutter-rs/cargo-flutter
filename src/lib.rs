@@ -59,7 +59,7 @@ impl EngineInfo {
         let is_macos = self.target.contains("apple");
 
         if path.exists() {
-            println!("Flutter engine already exist. Download not necessary");
+            log::info!("Flutter engine already exist. Download not necessary");
             return Err(Error::AlreadyDownloaded);
         }
 
