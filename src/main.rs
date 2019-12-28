@@ -22,13 +22,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .author("flutter-rs")
                 .about("Provides a smooth experience for developing flutter-rs apps.")
                 .arg(
-                    Arg::with_name("target")
-                        .long("target")
-                        .value_name("TARGET")
-                        .takes_value(true)
-                        .help("The triple for the target"),
-                )
-                .arg(
                     Arg::with_name("cargo-args")
                         .value_name("CARGO_ARGS")
                         .takes_value(true)
@@ -45,40 +38,50 @@ fn main() -> Result<(), Box<dyn Error>> {
         exit(1);
     };
 
-    let cargo_config = Config::default()?;
-    let root_manifest = find_root_manifest_for_wd(cargo_config.cwd())?;
-    let workspace = Workspace::new(&root_manifest, &cargo_config)?;
-    // TODO -p flag
-    let config = load_config(&workspace, None)?;
-
-    let rustc = cargo_config.load_global_rustc(Some(&workspace))?;
-    let target = matches.value_of("target").unwrap_or(rustc.host.as_str());
     let cargo_args: Vec<&str> = matches
         .values_of("cargo-args")
         .expect("cargo-args to not be null")
         .collect();
 
-    let engine_path = download(config.version, target.to_string())?;
+    let target = get_arg(&cargo_args, |f| f == "--target");
+    let package = get_arg(&cargo_args, |f| f == "--package" || f == "-p");
 
-    let status = run(cargo_config.cwd(), target, cargo_args, &engine_path);
+    let cargo_config = Config::default()?;
+    let root_manifest = find_root_manifest_for_wd(cargo_config.cwd())?;
+    let workspace = Workspace::new(&root_manifest, &cargo_config)?;
+
+    let config = load_config(&workspace, &package)?;
+
+    let version = config
+        .version
+        .unwrap_or(cargo_flutter::get_flutter_version()?);
+    let rustc = cargo_config.load_global_rustc(Some(&workspace))?;
+    let target = target.unwrap_or(rustc.host.as_str()).to_string();
+
+    let engine_path = download(version, target)?;
+
+    let status = run(&cargo_config, &cargo_args, &engine_path);
 
     exit(status.code().unwrap_or(-1));
 }
 
+fn get_arg<'a, F: Fn(&str) -> bool>(args: &'a [&str], matches: F) -> Option<&'a str> {
+    args.into_iter()
+        .position(|f| matches(*f))
+        .map(|pos| args.into_iter().nth(pos + 1))
+        .unwrap_or_default()
+        .map(|r| *r)
+}
+
 fn load_config(
     workspace: &Workspace,
-    flag_package: Option<String>,
+    package: &Option<&str>,
 ) -> Result<TomlFlutter, Box<dyn Error>> {
-    let package = if let Some(package) = flag_package {
+    let package = if let Some(package) = package {
         workspace
             .members()
-            .find(|pkg| pkg.name().as_str() == package.as_str())
-            .ok_or_else(|| {
-                format_err!(
-                    "package `{}` is not a member of the workspace",
-                    package.as_str()
-                )
-            })?
+            .find(|pkg| &pkg.name().as_str() == package)
+            .ok_or_else(|| format_err!("package `{}` is not a member of the workspace", package))?
     } else {
         workspace.current()?
     };
@@ -95,8 +98,7 @@ fn load_config(
     Ok(flutter)
 }
 
-fn download(_version: Option<String>, target: String) -> Result<PathBuf, Box<dyn Error>> {
-    let version = cargo_flutter::get_flutter_version()?;
+fn download(version: String, target: String) -> Result<PathBuf, Box<dyn Error>> {
     log::debug!("Engine version is {:?}", version);
 
     let info = EngineInfo::new(version, target);
@@ -113,13 +115,14 @@ fn download(_version: Option<String>, target: String) -> Result<PathBuf, Box<dyn
     Ok(engine_path)
 }
 
-fn run(dir: &Path, triple: &str, cargo_args: Vec<&str>, engine_path: &Path) -> ExitStatus {
+fn run(cargo_config: &Config, cargo_args: &[&str], engine_path: &Path) -> ExitStatus {
     Command::new("cargo")
-        .current_dir(dir)
-        .env("RUSTFLAGS", format!("-Clink-arg=-L{}", engine_path.parent().unwrap().display()))
+        .current_dir(cargo_config.cwd())
+        .env(
+            "RUSTFLAGS",
+            format!("-Clink-arg=-L{}", engine_path.parent().unwrap().display()),
+        )
         .args(cargo_args)
-        .arg("--target")
-        .arg(&triple)
         .status()
         .expect("Success")
 }
