@@ -142,7 +142,10 @@ fn run_bundle(workspace: &Workspace) -> ExitStatus {
 
 fn run_cargo(workspace: &Workspace, cargo_args: &[&str], engine_path: &Path) -> ExitStatus {
     let target_dir = workspace.target_dir().into_path_unlocked();
-    let rustflags = format!("-Clink-arg=-L{}", engine_path.parent().unwrap().display());
+    let rustflags = format!(
+        "-Clink-arg=-L{0} -Clink-arg=-Wl,-rpath={0}",
+        engine_path.parent().unwrap().display(),
+    );
     Command::new("cargo")
         .current_dir(workspace.config().cwd())
         .env("RUSTFLAGS", rustflags)
