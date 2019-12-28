@@ -59,7 +59,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let rustc = cargo_config.load_global_rustc(Some(&workspace))?;
     let target = target.unwrap_or(rustc.host.as_str()).to_string();
 
-    let engine_path = download(version, target)?;
+    let engine_path = std::env::var("FLUTTER_ENGINE_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| download(version, target).unwrap());
 
     if *cmd == "run" {
         println!("flutter build bundle");
