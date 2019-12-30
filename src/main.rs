@@ -1,6 +1,6 @@
 use cargo::util::Config;
 use cargo_flutter::package::appimage::AppImage;
-use cargo_flutter::{Cargo, Engine, Error, Flutter, Package, TomlConfig};
+use cargo_flutter::{Build, Cargo, Engine, Error, Flutter, Package, TomlConfig};
 use clap::{App, AppSettings, Arg, SubCommand};
 use std::process::{exit, ExitStatus};
 use std::{env, str};
@@ -50,8 +50,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cargo_config = Config::default()?;
     let cargo = Cargo::new(&cargo_config, cargo_args)?;
     let config = TomlConfig::load(&cargo)?;
+    let metadata = config.metadata();
     let flutter = Flutter::new()?;
-    let engine = Engine::new(flutter.engine_version()?, cargo.triple()?);
+    let engine_version = metadata
+        .engine_version()
+        .unwrap_or_else(|| flutter.engine_version().unwrap());
+    let engine = Engine::new(engine_version, cargo.triple()?, Build::Debug);
     engine.download();
 
     println!("flutter build bundle");
@@ -60,7 +64,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     check_status(cargo.run(&engine.engine_path()));
 
     if let Some(format) = format {
-        let metadata = config.package.metadata.unwrap_or_default();
         let mut package = Package::new(&config.package.name);
         package.add_bin(
             cargo

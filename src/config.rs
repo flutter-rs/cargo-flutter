@@ -40,4 +40,14 @@ impl TomlConfig {
         let string = std::str::from_utf8(&bytes)?;
         Ok(toml::from_str(string)?)
     }
+
+    pub fn metadata(&self) -> TomlMetadata {
+        self.package.metadata.clone().unwrap_or_default()
+    }
+}
+
+impl TomlMetadata {
+    pub fn engine_version(&self) -> Option<String> {
+        self.flutter.clone().unwrap_or_default().engine_version
+    }
 }

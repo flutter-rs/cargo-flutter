@@ -10,23 +10,50 @@ use std::{fs, thread};
 pub struct Engine {
     version: String,
     target: String,
+    build: Build,
+}
+
+#[derive(Debug)]
+pub enum Build {
+    Debug,
+    Release,
+    Profile,
+}
+
+impl Build {
+    pub fn build(&self) -> &str {
+        match self {
+            Self::Debug => "debug_unopt",
+            Self::Release => "release",
+            Self::Profile => "profile",
+        }
+    }
 }
 
 impl Engine {
-    pub fn new(version: String, target: String) -> Engine {
-        Engine { version, target }
+    pub fn new(version: String, target: String, build: Build) -> Engine {
+        Engine {
+            version,
+            target,
+            build,
+        }
     }
 
     pub fn download_url(&self) -> String {
-        let (platform, file) = match self.target.as_str() {
-            "x86_64-unknown-linux-gnu" => ("linux-x64", "linux-x64-embedder"),
-            "x86_64-apple-darwin" => ("darwin-x64", "FlutterEmbedder.framework.zip"),
-            "x86_64-pc-windows-msvc" => ("windows-x64", "windows-x64-embedder.zip"),
+        let build = self.build.build();
+        let file = match self.target.as_str() {
+            "x86_64-unknown-linux-gnu" => format!("engine-linux_x64-host_{}", build),
+            "armv7-linux-androideabi" => format!("engine-linux_x64-android_{}", build),
+            "aarch64-linux-android" => format!("engine-linux_x64-android_{}_arm64", build),
+            "i686-linux-android" => format!("engine-linux_x64-android_{}_x64", build),
+            "x86_64-linux-android" => format!("engine-linux_x64-android_{}_x86", build),
+            //"x86_64-apple-darwin" => ("darwin-x64", "FlutterEmbedder.framework.zip"),
+            //"x86_64-pc-windows-msvc" => ("windows-x64", "windows-x64-embedder.zip"),
             _ => panic!("unsupported platform"),
         };
         format!(
-            "https://storage.googleapis.com/flutter_infra/flutter/{}/{}/{}",
-            &self.version, platform, file
+            "https://github.com/flutter-rs/engine-builds/releases/download/f_{}/{}",
+            &self.version, file
         )
     }
 
@@ -48,6 +75,7 @@ impl Engine {
                 .join("flutter-engine")
                 .join(&self.version)
                 .join(&self.target)
+                .join("engine_out")
                 .join(self.library_name())
         };
         log::info!("FLUTTER_ENGINE_PATH {}", path.display());
