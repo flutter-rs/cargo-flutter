@@ -1,3 +1,5 @@
+use crate::cargo::Cargo;
+use crate::engine::Build;
 use crate::error::Error;
 use cargo::core::Workspace;
 use std::path::PathBuf;
@@ -40,18 +42,23 @@ impl Flutter {
         Ok(version)
     }
 
-    pub fn bundle(&self, workspace: &Workspace) -> ExitStatus {
-        let target_dir = workspace.target_dir().into_path_unlocked();
+    pub fn bundle(&self, cargo: &Cargo, build: Build) -> ExitStatus {
+        let flag = match build {
+            Build::Debug => "--debug",
+            Build::Release => "--release",
+            Build::Profile => "--profile",
+        };
 
         Command::new("flutter")
-            .current_dir(workspace.root())
+            .current_dir(cargo.workspace().root())
             .arg("build")
             .arg("bundle")
+            .arg(flag)
             .arg("--track-widget-creation")
             .arg("--asset-dir")
-            .arg(target_dir.join("flutter_assets"))
+            .arg(cargo.build_dir().join("flutter_assets"))
             .arg("--depfile")
-            .arg(target_dir.join("snapshot_blob.bin.d"))
+            .arg(cargo.build_dir().join("snapshot_blob.bin.d"))
             .status()
             .expect("flutter build bundle")
     }

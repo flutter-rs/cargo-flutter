@@ -38,6 +38,10 @@ impl<'a> Cargo<'a> {
         self.arg(|f| f == "--package" || f == "-p")
     }
 
+    pub fn release(&self) -> bool {
+        self.args.iter().find(|f| **f == "--release").is_some()
+    }
+
     pub fn host_target(&self) -> Result<String, Error> {
         let rustc = self
             .workspace
@@ -62,17 +66,38 @@ impl<'a> Cargo<'a> {
         self.workspace().target_dir().into_path_unlocked()
     }
 
+    pub fn flutter_dir(&self) -> PathBuf {
+        self.target_dir().join("flutter")
+    }
+
+    pub fn build_dir(&self) -> PathBuf {
+        let flutter_dir = self.flutter_dir();
+        let triple_dir = if let Some(target) = self.target() {
+            flutter_dir.join(target)
+        } else {
+            flutter_dir
+        };
+        if self.release() {
+            triple_dir.join("release")
+        } else {
+            triple_dir.join("debug")
+        }
+    }
+
     pub fn run(&self, engine_path: &Path) -> ExitStatus {
-        let rustflags = format!(
-            "-Clink-arg=-L{0} -Clink-arg=-Wl,-rpath={0}",
-            engine_path.parent().unwrap().display(),
-        );
+        let engine_dir = engine_path.parent().unwrap();
+        let rpath = if !self.release() {
+            format!(" -Clink-arg=-Wl,-rpath={}", engine_dir.display())
+        } else {
+            "".to_string()
+        };
+        let rustflags = format!("-Clink-arg=-L{}{}", engine_dir.display(), rpath);
         Command::new("cargo")
             .current_dir(self.workspace.config().cwd())
             .env("RUSTFLAGS", rustflags)
             .args(&self.args)
             .arg("--target-dir")
-            .arg(self.target_dir().join("flutter"))
+            .arg(self.flutter_dir())
             .status()
             .expect("Success")
     }

@@ -1,5 +1,5 @@
+use crate::cargo::Cargo;
 use crate::package::Package;
-use cargo::core::Workspace;
 use serde::Deserialize;
 use std::fs::Permissions;
 use std::os::unix::fs::PermissionsExt;
@@ -23,11 +23,11 @@ impl AppImage {
 
     pub fn build(
         &self,
-        workspace: &Workspace,
+        cargo: &Cargo,
         package: &Package,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let target_dir = workspace.target_dir().into_path_unlocked();
-        let appimage_dir = target_dir.join("appimage");
+        let build_dir = cargo.build_dir();
+        let appimage_dir = build_dir.join("appimage");
         let name = self.toml.name.as_ref().unwrap_or(&package.name);
         let exec = &package.name;
         let icon_path = self
@@ -35,7 +35,7 @@ impl AppImage {
             .icon
             .as_ref()
             .map(PathBuf::from)
-            .unwrap_or_else(|| workspace.root().join("assets").join("icon.svg"));
+            .unwrap_or_else(|| cargo.workspace().root().join("assets").join("icon.svg"));
         if !icon_path.exists() {
             return Err(failure::format_err!("Icon not found {}", icon_path.display()).into());
         }
@@ -44,7 +44,7 @@ impl AppImage {
             .map(|f| f.to_str().unwrap())
             .unwrap_or("icon")
             .to_string();
-        std::fs::remove_dir_all(&appimage_dir)?;
+        std::fs::remove_dir_all(&appimage_dir).ok();
 
         let bin_dir = appimage_dir.join("usr").join("bin");
         std::fs::create_dir_all(&bin_dir)?;
@@ -78,7 +78,7 @@ impl AppImage {
         )?;
 
         Command::new("appimagetool")
-            .current_dir(&target_dir)
+            .current_dir(&build_dir)
             .arg("appimage")
             .status()
             .expect("Success");
@@ -92,6 +92,7 @@ SELF=$(readlink -f "$0")
 HERE=${SELF%/*}
 export PATH="${HERE}/usr/bin/${PATH:+:$PATH}"
 export LD_LIBRARY_PATH="${HERE}/usr/lib/:${LD_LIBRARY_PATH:+:$LDLIBRARY_PATH}"
+export FLUTTER_ASSET_DIR="${HERE}/usr/share/flutter_assets"
 EXEC=$(grep -e '^Exec=.*' "${HERE}"/*.desktop | head -n 1 | cut -d "=" -f 2 | cut -d " " -f 1)
 exec "${EXEC}" "$@"
 "#;

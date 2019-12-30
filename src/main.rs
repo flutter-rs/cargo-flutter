@@ -49,35 +49,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cargo_config = Config::default()?;
     let cargo = Cargo::new(&cargo_config, cargo_args)?;
+    let build = if cargo.release() {
+        Build::Release
+    } else {
+        Build::Debug
+    };
     let config = TomlConfig::load(&cargo)?;
     let metadata = config.metadata();
     let flutter = Flutter::new()?;
     let engine_version = metadata
         .engine_version()
         .unwrap_or_else(|| flutter.engine_version().unwrap());
-    let engine = Engine::new(engine_version, cargo.triple()?, Build::Debug);
+    let engine = Engine::new(engine_version, cargo.triple()?, build);
     engine.download();
 
     println!("flutter build bundle");
-    check_status(flutter.bundle(cargo.workspace()));
+    check_status(flutter.bundle(&cargo, build));
 
+    let flutter_asset_dir = cargo.build_dir().join("flutter_assets");
+    std::env::set_var("FLUTTER_ASSET_DIR", &flutter_asset_dir);
     check_status(cargo.run(&engine.engine_path()));
 
     if let Some(format) = format {
         let mut package = Package::new(&config.package.name);
         package.add_bin(
             cargo
-                .target_dir()
-                .join("flutter")
-                .join("debug")
-                .join(&config.package.name),
+                .build_dir()
+                .join(&config.package.name)
         );
         package.add_lib(engine.engine_path());
-        package.add_asset(cargo.target_dir().join("flutter_assets"));
+        package.add_asset(flutter_asset_dir);
         match format {
             "appimage" => {
                 let builder = AppImage::new(metadata.appimage.unwrap_or_default());
-                builder.build(cargo.workspace(), &package)?;
+                builder.build(&cargo, &package)?;
             }
             _ => Err(Error::FormatNotSupported)?,
         }

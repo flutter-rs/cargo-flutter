@@ -13,7 +13,7 @@ pub struct Engine {
     build: Build,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum Build {
     Debug,
     Release,
@@ -75,6 +75,7 @@ impl Engine {
                 .join("flutter-engine")
                 .join(&self.version)
                 .join(&self.target)
+                .join(self.build.build())
                 .join("engine_out")
                 .join(self.library_name())
         };
@@ -85,7 +86,7 @@ impl Engine {
     pub fn download(&self) {
         let url = self.download_url();
         let path = self.engine_path();
-        let dir = path.parent().unwrap().to_owned();
+        let dir = path.parent().unwrap().parent().unwrap().to_owned();
         let is_macos = self.target.contains("apple");
 
         if path.exists() {
