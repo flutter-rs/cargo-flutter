@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 cargo = "0.41.0"
 clap = "2.33.0"
+copy_dir = "0.1.2"
 curl = { version = "0.4.25", features = ["http2"] }
 dirs = "2.0.2"
 env_logger = "0.7.1"

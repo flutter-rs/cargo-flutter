@@ -1,7 +1,8 @@
 use cargo::util::Config;
-use cargo_flutter::{Cargo, Engine, Flutter, TomlConfig};
+use cargo_flutter::package::appimage::AppImage;
+use cargo_flutter::{Cargo, Engine, Error, Flutter, Package, TomlConfig};
 use clap::{App, AppSettings, Arg, SubCommand};
-use std::process::exit;
+use std::process::{exit, ExitStatus};
 use std::{env, str};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -15,6 +16,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .version(env!("CARGO_PKG_VERSION"))
                 .author("flutter-rs")
                 .about("Provides a smooth experience for developing flutter-rs apps.")
+                .arg(
+                    Arg::with_name("format")
+                        .short("f")
+                        .long("format")
+                        .value_name("FORMAT")
+                        .takes_value(true)
+                        .help("Packaging format"),
+                )
                 .arg(
                     Arg::with_name("cargo-args")
                         .value_name("CARGO_ARGS")
@@ -36,24 +45,50 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .values_of("cargo-args")
         .expect("cargo-args to not be null")
         .collect();
+    let format = matches.value_of("format");
 
     let cargo_config = Config::default()?;
     let cargo = Cargo::new(&cargo_config, cargo_args)?;
-    let _config = TomlConfig::load(&cargo)?;
+    let config = TomlConfig::load(&cargo)?;
     let flutter = Flutter::new()?;
     let engine = Engine::new(flutter.engine_version()?, cargo.triple()?);
     engine.download();
 
-    if cargo.cmd() == "run" {
-        println!("flutter build bundle");
-        flutter.bundle(cargo.workspace());
-    }
+    println!("flutter build bundle");
+    check_status(flutter.bundle(cargo.workspace()));
 
-    let status = cargo.run(&engine.engine_path());
+    check_status(cargo.run(&engine.engine_path()));
+
+    if let Some(format) = format {
+        let metadata = config.package.metadata.unwrap_or_default();
+        let mut package = Package::new(&config.package.name);
+        package.add_bin(
+            cargo
+                .target_dir()
+                .join("flutter")
+                .join("debug")
+                .join(&config.package.name),
+        );
+        package.add_lib(engine.engine_path());
+        package.add_asset(cargo.target_dir().join("flutter_assets"));
+        match format {
+            "appimage" => {
+                let builder = AppImage::new(metadata.appimage.unwrap_or_default());
+                builder.build(cargo.workspace(), &package)?;
+            }
+            _ => Err(Error::FormatNotSupported)?,
+        }
+    }
 
     /*if cargo.cmd() == "run" {
         flutter.attach(cargo.workspace(), "");
     }*/
 
-    exit(status.code().unwrap_or(-1));
+    Ok(())
+}
+
+fn check_status(status: ExitStatus) {
+    if status.code() != Some(0) {
+        exit(status.code().unwrap_or(-1));
+    }
 }

@@ -2,7 +2,7 @@ use crate::error::Error;
 use cargo::core::Workspace;
 use cargo::util::important_paths::find_root_manifest_for_wd;
 use cargo::util::Config;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
 pub struct Cargo<'a> {
@@ -58,8 +58,11 @@ impl<'a> Cargo<'a> {
         &self.workspace
     }
 
+    pub fn target_dir(&self) -> PathBuf {
+        self.workspace().target_dir().into_path_unlocked()
+    }
+
     pub fn run(&self, engine_path: &Path) -> ExitStatus {
-        let target_dir = self.workspace.target_dir().into_path_unlocked();
         let rustflags = format!(
             "-Clink-arg=-L{0} -Clink-arg=-Wl,-rpath={0}",
             engine_path.parent().unwrap().display(),
@@ -69,7 +72,7 @@ impl<'a> Cargo<'a> {
             .env("RUSTFLAGS", rustflags)
             .args(&self.args)
             .arg("--target-dir")
-            .arg(target_dir.join("flutter"))
+            .arg(self.target_dir().join("flutter"))
             .status()
             .expect("Success")
     }

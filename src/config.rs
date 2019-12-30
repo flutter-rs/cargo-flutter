@@ -16,6 +16,7 @@ pub struct TomlPackage {
 #[derive(Debug, Default, Clone, Deserialize)]
 pub struct TomlMetadata {
     pub flutter: Option<TomlFlutter>,
+    pub appimage: Option<crate::package::appimage::TomlAppImage>,
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
