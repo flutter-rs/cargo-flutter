@@ -1,8 +1,7 @@
 use crate::cargo::Cargo;
 use crate::engine::Build;
 use crate::error::Error;
-use cargo::core::Workspace;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub struct Flutter {
@@ -23,8 +22,11 @@ impl Flutter {
                 .ok_or(Error::FlutterNotFound)?
                 .to_owned()
         };
-        log::info!("FLUTTER_ROOT {}", root.display());
         Ok(Flutter { root })
+    }
+
+    pub fn root(&self) -> &Path {
+        &self.root
     }
 
     pub fn engine_version(&self) -> Result<String, Error> {
@@ -38,7 +40,6 @@ impl Flutter {
                 .join("engine.version");
             std::fs::read_to_string(path).map(|v| v.trim().to_owned())?
         };
-        log::info!("FLUTTER_ENGINE_VERSION {}", version);
         Ok(version)
     }
 
@@ -67,13 +68,53 @@ impl Flutter {
         Ok(())
     }
 
-    pub fn attach(&self, workspace: &Workspace, debug_uri: &str) -> Result<(), Error> {
+    pub fn attach(&self, cargo: &Cargo, debug_uri: &str) -> Result<(), Error> {
         let debug_uri = format!("--debug-uri={}", debug_uri);
         let status = Command::new("flutter")
-            .current_dir(workspace.root())
+            .current_dir(cargo.workspace().root())
             .arg("attach")
             .arg("--device-id=flutter-tester")
             .arg(debug_uri)
+            .status()
+            .expect("Success");
+        if status.code() != Some(0) {
+            return Err(Error::FlutterError);
+        }
+        Ok(())
+    }
+
+    pub fn aot(&self, cargo: &Cargo, engine_path: &Path) -> Result<(), Error> {
+        let root = cargo.workspace().root();
+        let build_dir = cargo.build_dir();
+        let engine_dir = engine_path.parent().unwrap();
+        let snapshot = build_dir.join("kernel_snapshot.dill");
+        let status = Command::new(engine_dir.join("dart"))
+            .current_dir(root)
+            .arg(engine_dir.join("gen").join("frontend_server.dart.snapshot"))
+            .arg("--sdk-root")
+            .arg(engine_dir.join("flutter_patched_sdk"))
+            .arg("--target=flutter")
+            .arg("--aot")
+            .arg("--tfa")
+            .arg("-Ddart.vm.product=true")
+            .arg("--packages")
+            .arg(".packages")
+            .arg("--output-dill")
+            .arg(&snapshot)
+            .arg(root.join("lib").join("main.dart"))
+            .status()
+            .expect("Success");
+        if status.code() != Some(0) {
+            return Err(Error::FlutterError);
+        }
+        let status = Command::new(engine_dir.join("gen_snapshot"))
+            .current_dir(root)
+            .arg("--causal_async_stacks")
+            .arg("--deterministic")
+            .arg("--snapshot_kind=app-aot-elf")
+            .arg("--strip")
+            .arg(format!("--elf={}", build_dir.join("app.so").display()))
+            .arg(&snapshot)
             .status()
             .expect("Success");
         if status.code() != Some(0) {

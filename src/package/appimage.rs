@@ -93,6 +93,7 @@ HERE=${SELF%/*}
 export PATH="${HERE}/usr/bin/${PATH:+:$PATH}"
 export LD_LIBRARY_PATH="${HERE}/usr/lib/:${LD_LIBRARY_PATH:+:$LDLIBRARY_PATH}"
 export FLUTTER_ASSET_DIR="${HERE}/usr/share/flutter_assets"
+export FLUTTER_AOT_SNAPSHOT="${HERE}/usr/lib/app.so"
 EXEC=$(grep -e '^Exec=.*' "${HERE}"/*.desktop | head -n 1 | cut -d "=" -f 2 | cut -d " " -f 1)
 exec "${EXEC}" "$@"
 "#;

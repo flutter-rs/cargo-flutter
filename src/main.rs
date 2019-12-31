@@ -24,9 +24,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .help("Packaging format"),
                 )
                 .arg(
+                    Arg::with_name("no-flutter")
+                        .long("no-flutter")
+                        .help("shortcut for no-bundle, no-attach and no-aot"),
+                )
+                .arg(
                     Arg::with_name("no-bundle")
                         .long("no-bundle")
                         .help("Skips running flutter bundle"),
+                )
+                .arg(
+                    Arg::with_name("no-attach")
+                        .long("no-attach")
+                        .help("Skips attaching the flutter debugger"),
+                )
+                .arg(
+                    Arg::with_name("no-aot")
+                        .long("no-aot")
+                        .help("Skips creating aot blob"),
                 )
                 .arg(
                     Arg::with_name("cargo-args")
@@ -55,22 +70,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         Build::Debug
     };
+    let aot = build == Build::Release;
     let config = TomlConfig::load(&cargo)?;
     let metadata = config.metadata();
     let flutter = Flutter::new()?;
     let engine_version = metadata
         .engine_version()
         .unwrap_or_else(|| flutter.engine_version().unwrap());
+
+    log::debug!("FLUTTER_ROOT {}", flutter.root().display());
+    log::debug!("FLUTTER_ENGINE_VERSION {}", engine_version);
+
     let engine = Engine::new(engine_version, cargo.triple()?, build);
+    let engine_path = engine.engine_path();
+    let flutter_asset_dir = cargo.build_dir().join("flutter_assets");
+    let snapshot_path = cargo.build_dir().join("app.so");
+
+    log::debug!("FLUTTER_ENGINE_PATH {}", engine_path.display());
+    log::debug!("FLUTTER_ASSET_DIR {}", flutter_asset_dir.display());
+
     engine.download();
 
-    if !matches.is_present("no-bundle") {
+    if !matches.is_present("no-flutter") && !matches.is_present("no-bundle") {
         println!("flutter build bundle");
         flutter.bundle(&cargo, build)?;
     }
 
-    let flutter_asset_dir = cargo.build_dir().join("flutter_assets");
-    let engine_path = engine.engine_path();
+    if !matches.is_present("no-flutter") && !matches.is_present("no-aot") {
+        if aot {
+            flutter.aot(&cargo, &engine_path)?;
+        }
+    }
 
     match cargo.cmd() {
         "build" => {
@@ -80,6 +110,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut package = Package::new(&config.package.name);
                 package.add_bin(cargo.build_dir().join(&config.package.name));
                 package.add_lib(engine_path);
+                if aot {
+                    package.add_lib(snapshot_path);
+                }
                 package.add_asset(flutter_asset_dir);
                 match format {
                     "appimage" => {
@@ -91,10 +124,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         "run" => {
+            std::env::set_var("FLUTTER_AOT_SNAPSHOT", &snapshot_path);
             std::env::set_var("FLUTTER_ASSET_DIR", &flutter_asset_dir);
-            let debug_uri = cargo.run(&engine.engine_path())?;
+            let debug_uri = cargo.run(&engine_path)?;
             log::info!("Observatory at {}", debug_uri);
-            flutter.attach(cargo.workspace(), &debug_uri)?;
+
+            if !matches.is_present("no-flutter") && !matches.is_present("no-attach") {
+                flutter.attach(&cargo, &debug_uri)?;
+            }
         }
         _ => cargo.build(&engine_path)?,
     }
