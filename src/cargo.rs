@@ -111,7 +111,8 @@ impl<'a> Cargo<'a> {
     }
 
     pub fn run(&self, engine_path: &Path) -> Result<String, Error> {
-        let mut child = self.cargo_command(engine_path)
+        let mut child = self
+            .cargo_command(engine_path)
             .stdout(Stdio::piped())
             .spawn()
             .expect("Success");

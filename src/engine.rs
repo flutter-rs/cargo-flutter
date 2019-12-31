@@ -6,14 +6,14 @@ use std::process::Command;
 use std::sync::{mpsc, Mutex};
 use std::{fs, thread};
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Engine {
     version: String,
     target: String,
     build: Build,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Build {
     Debug,
     Release,
@@ -79,7 +79,6 @@ impl Engine {
                 .join("engine_out")
                 .join(self.library_name())
         };
-        log::info!("FLUTTER_ENGINE_PATH {}", path.display());
         path
     }
 
