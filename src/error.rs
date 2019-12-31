@@ -4,6 +4,9 @@ pub enum Error {
     EnginePresent,
     FlutterNotFound,
     FormatNotSupported,
+    CargoError,
+    FlutterError,
+    NotCalledWithCargo,
     Which(which::Error),
     Io(std::io::Error),
     Toml(toml::de::Error),
@@ -18,6 +21,11 @@ impl std::fmt::Display for Error {
             Error::EnginePresent => write!(f, "Flutter engine already downloaded"),
             Error::FlutterNotFound => write!(f, "Couldn't find flutter sdk"),
             Error::FormatNotSupported => write!(f, "Format not supported"),
+            Error::CargoError => write!(f, "Cargo did not exit successfully"),
+            Error::FlutterError => write!(f, "Flutter did not exit successfully"),
+            Error::NotCalledWithCargo => {
+                write!(f, "This binary may only be called via `cargo flutter`.")
+            }
             Error::Which(error) => error.fmt(f),
             Error::Io(error) => error.fmt(f),
             Error::Toml(error) => error.fmt(f),

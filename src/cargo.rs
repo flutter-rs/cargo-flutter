@@ -2,8 +2,9 @@ use crate::error::Error;
 use cargo::core::Workspace;
 use cargo::util::important_paths::find_root_manifest_for_wd;
 use cargo::util::Config;
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus};
+use std::process::{Command, Stdio};
 
 pub struct Cargo<'a> {
     args: Vec<&'a str>,
@@ -84,7 +85,7 @@ impl<'a> Cargo<'a> {
         }
     }
 
-    pub fn run(&self, engine_path: &Path) -> ExitStatus {
+    fn cargo_command(&self, engine_path: &Path) -> Command {
         let engine_dir = engine_path.parent().unwrap();
         let rpath = if !self.release() {
             format!(" -Clink-arg=-Wl,-rpath={}", engine_dir.display())
@@ -92,13 +93,32 @@ impl<'a> Cargo<'a> {
             "".to_string()
         };
         let rustflags = format!("-Clink-arg=-L{}{}", engine_dir.display(), rpath);
-        Command::new("cargo")
-            .current_dir(self.workspace.config().cwd())
+        let mut cmd = Command::new("cargo");
+        cmd.current_dir(self.workspace.config().cwd())
             .env("RUSTFLAGS", rustflags)
             .args(&self.args)
             .arg("--target-dir")
-            .arg(self.flutter_dir())
-            .status()
-            .expect("Success")
+            .arg(self.flutter_dir());
+        cmd
+    }
+
+    pub fn build(&self, engine_path: &Path) -> Result<(), Error> {
+        let status = self.cargo_command(engine_path).status().expect("Success");
+        if status.code() != Some(0) {
+            return Err(Error::CargoError);
+        }
+        Ok(())
+    }
+
+    pub fn run(&self, engine_path: &Path) -> Result<String, Error> {
+        let mut child = self.cargo_command(engine_path)
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("Success");
+        let stdout = child.stdout.as_mut().unwrap();
+        let mut buffer = [0; 70];
+        stdout.read_exact(&mut buffer)?;
+        let string = std::str::from_utf8(&buffer)?;
+        Ok(string[34..].to_string())
     }
 }

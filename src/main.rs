@@ -2,7 +2,6 @@ use cargo::util::Config;
 use cargo_flutter::package::appimage::AppImage;
 use cargo_flutter::{Build, Cargo, Engine, Error, Flutter, Package, TomlConfig};
 use clap::{App, AppSettings, Arg, SubCommand};
-use std::process::{exit, ExitStatus};
 use std::{env, str};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,6 +24,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .help("Packaging format"),
                 )
                 .arg(
+                    Arg::with_name("no-bundle")
+                        .long("no-bundle")
+                        .help("Skips running flutter bundle"),
+                )
+                .arg(
                     Arg::with_name("cargo-args")
                         .value_name("CARGO_ARGS")
                         .takes_value(true)
@@ -37,16 +41,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = if let Some(matches) = app_matches.subcommand_matches("flutter") {
         matches
     } else {
-        eprintln!("This binary may only be called via `cargo flutter`.");
-        exit(1);
+        return Err(Error::NotCalledWithCargo.into());
     };
 
     let cargo_args: Vec<&str> = matches
         .values_of("cargo-args")
         .expect("cargo-args to not be null")
         .collect();
-    let format = matches.value_of("format");
-
     let cargo_config = Config::default()?;
     let cargo = Cargo::new(&cargo_config, cargo_args)?;
     let build = if cargo.release() {
@@ -63,40 +64,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let engine = Engine::new(engine_version, cargo.triple()?, build);
     engine.download();
 
-    println!("flutter build bundle");
-    check_status(flutter.bundle(&cargo, build));
+    if !matches.is_present("no-bundle") {
+        println!("flutter build bundle");
+        flutter.bundle(&cargo, build)?;
+    }
 
     let flutter_asset_dir = cargo.build_dir().join("flutter_assets");
-    std::env::set_var("FLUTTER_ASSET_DIR", &flutter_asset_dir);
-    check_status(cargo.run(&engine.engine_path()));
+    let engine_path = engine.engine_path();
 
-    if let Some(format) = format {
-        let mut package = Package::new(&config.package.name);
-        package.add_bin(
-            cargo
-                .build_dir()
-                .join(&config.package.name)
-        );
-        package.add_lib(engine.engine_path());
-        package.add_asset(flutter_asset_dir);
-        match format {
-            "appimage" => {
-                let builder = AppImage::new(metadata.appimage.unwrap_or_default());
-                builder.build(&cargo, &package)?;
+    match cargo.cmd() {
+        "build" => {
+            cargo.build(&engine_path)?;
+
+            if let Some(format) = matches.value_of("format") {
+                let mut package = Package::new(&config.package.name);
+                package.add_bin(cargo.build_dir().join(&config.package.name));
+                package.add_lib(engine_path);
+                package.add_asset(flutter_asset_dir);
+                match format {
+                    "appimage" => {
+                        let builder = AppImage::new(metadata.appimage.unwrap_or_default());
+                        builder.build(&cargo, &package)?;
+                    }
+                    _ => Err(Error::FormatNotSupported)?,
+                }
             }
-            _ => Err(Error::FormatNotSupported)?,
         }
+        "run" => {
+            std::env::set_var("FLUTTER_ASSET_DIR", &flutter_asset_dir);
+            let debug_uri = cargo.run(&engine.engine_path())?;
+            log::info!("Observatory at {}", debug_uri);
+            flutter.attach(cargo.workspace(), &debug_uri)?;
+        }
+        _ => cargo.build(&engine_path)?,
     }
-
-    /*if cargo.cmd() == "run" {
-        flutter.attach(cargo.workspace(), "");
-    }*/
 
     Ok(())
-}
-
-fn check_status(status: ExitStatus) {
-    if status.code() != Some(0) {
-        exit(status.code().unwrap_or(-1));
-    }
 }

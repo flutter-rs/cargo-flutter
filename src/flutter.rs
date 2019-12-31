@@ -3,7 +3,7 @@ use crate::engine::Build;
 use crate::error::Error;
 use cargo::core::Workspace;
 use std::path::PathBuf;
-use std::process::{Command, ExitStatus};
+use std::process::Command;
 
 pub struct Flutter {
     root: PathBuf,
@@ -42,14 +42,14 @@ impl Flutter {
         Ok(version)
     }
 
-    pub fn bundle(&self, cargo: &Cargo, build: Build) -> ExitStatus {
+    pub fn bundle(&self, cargo: &Cargo, build: Build) -> Result<(), Error> {
         let flag = match build {
             Build::Debug => "--debug",
             Build::Release => "--release",
             Build::Profile => "--profile",
         };
 
-        Command::new("flutter")
+        let status = Command::new("flutter")
             .current_dir(cargo.workspace().root())
             .arg("build")
             .arg("bundle")
@@ -60,17 +60,25 @@ impl Flutter {
             .arg("--depfile")
             .arg(cargo.build_dir().join("snapshot_blob.bin.d"))
             .status()
-            .expect("flutter build bundle")
+            .expect("flutter build bundle");
+        if status.code() != Some(0) {
+            return Err(Error::FlutterError);
+        }
+        Ok(())
     }
 
-    pub fn attach(&self, workspace: &Workspace, debug_uri: &str) -> ExitStatus {
+    pub fn attach(&self, workspace: &Workspace, debug_uri: &str) -> Result<(), Error> {
         let debug_uri = format!("--debug-uri={}", debug_uri);
-        Command::new("flutter")
+        let status = Command::new("flutter")
             .current_dir(workspace.root())
             .arg("attach")
             .arg("--device-id=flutter-tester")
             .arg(debug_uri)
             .status()
-            .expect("Success")
+            .expect("Success");
+        if status.code() != Some(0) {
+            return Err(Error::FlutterError);
+        }
+        Ok(())
     }
 }
