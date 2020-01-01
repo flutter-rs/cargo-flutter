@@ -1,8 +1,7 @@
 use curl::easy::Easy;
 use std::fs::File;
-use std::io::{BufReader, Write};
+use std::io::Write;
 use std::path::PathBuf;
-use std::process::Command;
 use std::sync::{mpsc, Mutex};
 use std::{fs, thread};
 
@@ -86,7 +85,6 @@ impl Engine {
         let url = self.download_url();
         let path = self.engine_path();
         let dir = path.parent().unwrap().parent().unwrap().to_owned();
-        let is_macos = self.target.contains("apple");
 
         if path.exists() {
             return;
@@ -126,30 +124,7 @@ impl Engine {
             println!("Download finished");
 
             println!("Extracting...");
-            let zip_file = File::open(&download_file).unwrap();
-            let reader = BufReader::new(zip_file);
-            let unzipper = unzip::Unzipper::new(reader, &dir);
-            unzipper.unzip().unwrap();
-
-            // mac framework file is a double zip file
-            if is_macos {
-                Command::new("unzip")
-                    .args(&[
-                        "FlutterEmbedder.framework.zip",
-                        "-d",
-                        "FlutterEmbedder.framework",
-                    ])
-                    .current_dir(&dir)
-                    .status()
-                    .unwrap();
-
-                // TODO: fixme
-                // unzip bug! Extracted file corrupted!
-                // let zip_file = File::open(dir.join("FlutterEmbedder.framework.zip")).unwrap();
-                // let reader = BufReader::new(zip_file);
-                // let unzipper = unzip::Unzipper::new(reader, dir.join("FlutterEmbedder.framework"));
-                // unzipper.unzip().unwrap();
-            }
+            crate::unzip::unzip(&download_file, &dir).unwrap();
         });
         for (total, done) in rx.iter() {
             println!("Downloading flutter engine {} of {}", done, total);
