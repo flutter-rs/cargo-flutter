@@ -74,9 +74,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = TomlConfig::load(&cargo)?;
     let metadata = config.metadata();
     let flutter = Flutter::new()?;
-    let engine_version = metadata
-        .engine_version()
-        .unwrap_or_else(|| flutter.engine_version().unwrap());
+    let engine_version = metadata.engine_version().unwrap_or_else(|| {
+        //flutter.engine_version().unwrap()
+        Engine::latest_version().unwrap()
+    });
 
     log::debug!("FLUTTER_ROOT {}", flutter.root().display());
     log::debug!("FLUTTER_ENGINE_VERSION {}", engine_version);

@@ -1,3 +1,4 @@
+use crate::error::Error;
 use curl::easy::Easy;
 use std::fs::File;
 use std::io::Write;
@@ -129,5 +130,11 @@ impl Engine {
         for (total, done) in rx.iter() {
             println!("Downloading flutter engine {} of {}", done, total);
         }
+    }
+
+    pub fn latest_version() -> Result<String, Error> {
+        let mut req =
+            ureq::get("https://api.github.com/repos/flutter-rs/engine-builds/releases/latest");
+        Ok(req.call().into_json()?["tag_name"].as_str().unwrap()[2..].to_string())
     }
 }
