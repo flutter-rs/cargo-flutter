@@ -25,6 +25,7 @@ impl AppImage {
         &self,
         cargo: &Cargo,
         package: &Package,
+        sign: bool,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let build_dir = cargo.build_dir();
         let appimage_dir = build_dir.join("appimage");
@@ -77,11 +78,12 @@ impl AppImage {
             appimage_dir.join(icon_path.file_name().unwrap()),
         )?;
 
-        Command::new("appimagetool")
-            .current_dir(&build_dir)
-            .arg("appimage")
-            .status()
-            .expect("Success");
+        let mut cmd = Command::new("appimagetool");
+        cmd.current_dir(&build_dir).arg("appimage");
+        if sign {
+            cmd.arg("--sign");
+        }
+        cmd.status().expect("Success");
 
         Ok(())
     }

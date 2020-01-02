@@ -71,6 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Build::Debug
     };
     let aot = build == Build::Release;
+    let sign = build == Build::Release;
     let config = TomlConfig::load(&cargo)?;
     let metadata = config.metadata();
     let flutter = Flutter::new()?;
@@ -118,7 +119,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 match format {
                     "appimage" => {
                         let builder = AppImage::new(metadata.appimage.unwrap_or_default());
-                        builder.build(&cargo, &package)?;
+                        builder.build(&cargo, &package, sign)?;
                     }
                     _ => Err(Error::FormatNotSupported)?,
                 }
