@@ -30,17 +30,12 @@ impl Flutter {
     }
 
     pub fn engine_version(&self) -> Result<String, Error> {
-        let version = if let Ok(v) = std::env::var("FLUTTER_ENGINE_VERSION") {
-            v
-        } else {
-            let path = self
-                .root
-                .join("bin")
-                .join("internal")
-                .join("engine.version");
-            std::fs::read_to_string(path).map(|v| v.trim().to_owned())?
-        };
-        Ok(version)
+        let path = self
+            .root
+            .join("bin")
+            .join("internal")
+            .join("engine.version");
+        Ok(std::fs::read_to_string(path).map(|v| v.trim().to_owned())?)
     }
 
     pub fn bundle(&self, cargo: &Cargo, build: Build) -> Result<(), Error> {

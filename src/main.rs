@@ -72,12 +72,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let aot = build == Build::Release;
     let sign = build == Build::Release;
-    let config = TomlConfig::load(&cargo)?;
-    let metadata = config.metadata();
+    let config = TomlConfig::load(&cargo).ok();
+    let metadata = config
+        .as_ref()
+        .map(|config| config.metadata())
+        .unwrap_or_default();
     let flutter = Flutter::new()?;
     let engine_version = metadata.engine_version().unwrap_or_else(|| {
-        //flutter.engine_version().unwrap()
-        Engine::latest_version().unwrap()
+        std::env::var("FLUTTER_ENGINE_VERSION").ok().unwrap_or_else(|| {
+            //flutter.engine_version().unwrap()
+            Engine::latest_version().unwrap()
+        })
     });
 
     log::debug!("FLUTTER_ROOT {}", flutter.root().display());
@@ -93,19 +98,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     engine.download();
 
-    if !matches.is_present("no-flutter") && !matches.is_present("no-bundle") {
-        println!("flutter build bundle");
-        flutter.bundle(&cargo, build)?;
-    }
+    if config.is_some() {
+        if !matches.is_present("no-flutter") && !matches.is_present("no-bundle") {
+            println!("flutter build bundle");
+            flutter.bundle(&cargo, build)?;
+        }
 
-    if !matches.is_present("no-flutter") && !matches.is_present("no-aot") {
-        if aot {
-            flutter.aot(&cargo, &engine_path)?;
+        if !matches.is_present("no-flutter") && !matches.is_present("no-aot") {
+            if aot {
+                flutter.aot(&cargo, &engine_path)?;
+            }
         }
     }
 
-    match cargo.cmd() {
-        "build" => {
+    match (cargo.cmd(), config) {
+        ("build", Some(config)) => {
             cargo.build(&engine_path)?;
 
             if let Some(format) = matches.value_of("format") {
@@ -125,7 +132,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        "run" => {
+        ("run", Some(_config)) => {
             std::env::set_var("FLUTTER_AOT_SNAPSHOT", &snapshot_path);
             std::env::set_var("FLUTTER_ASSET_DIR", &flutter_asset_dir);
             let debug_uri = cargo.run(&engine_path)?;
