@@ -44,6 +44,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .help("Skips creating aot blob"),
                 )
                 .arg(
+                    Arg::with_name("sign")
+                        .long("sign")
+                        .help("Sign package in debug build"),
+                )
+                .arg(
+                    Arg::with_name("no-sign")
+                        .long("no-sign")
+                        .help("Don't sign package in release build"),
+                )
+                .arg(
                     Arg::with_name("cargo-args")
                         .value_name("CARGO_ARGS")
                         .takes_value(true)
@@ -71,7 +81,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Build::Debug
     };
     let aot = build == Build::Release;
-    let sign = build == Build::Release;
+    let sign = build == Build::Debug && matches.is_present("sign")
+        || build == Build::Release && !matches.is_present("no-sign");
     let config = TomlConfig::load(&cargo).ok();
     let metadata = config
         .as_ref()
