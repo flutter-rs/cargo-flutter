@@ -1,17 +1,23 @@
 # Cargo plugin for building flutter applications
 
-*WARNING* Release builds don't currently work
-
 ## Getting started
 ```sh
-git clone https://github.com/flutter-rs/cargo-flutter
-cargo install cargo-flutter --path cargo-flutter
+cargo install cargo-flutter
 ```
 
 ## Usage
 
-`cargo flutter run`
-`cargo flutter --format appimage build`
+- Create a flutter-rs app
+
+    `git clone https://github.com/flutter-rs/flutter-app-template`
+
+- Run a flutter-rs app in dev mode
+
+    `cargo flutter run`
+
+- Bundle a flutter-rs app for distribution
+
+    `cargo flutter --format appimage build --release`
 
 ## Supported targets
 - x86_64-unknown-linux-gnu
