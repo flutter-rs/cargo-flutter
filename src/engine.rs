@@ -41,19 +41,19 @@ impl Engine {
 
     pub fn download_url(&self) -> String {
         let build = self.build.build();
-        let file = match self.target.as_str() {
-            "x86_64-unknown-linux-gnu" => format!("engine-linux_x64-host_{}", build),
-            "armv7-linux-androideabi" => format!("engine-linux_x64-android_{}", build),
-            "aarch64-linux-android" => format!("engine-linux_x64-android_{}_arm64", build),
-            "i686-linux-android" => format!("engine-linux_x64-android_{}_x64", build),
-            "x86_64-linux-android" => format!("engine-linux_x64-android_{}_x86", build),
-            //"x86_64-apple-darwin" => ("darwin-x64", "FlutterEmbedder.framework.zip"),
-            //"x86_64-pc-windows-msvc" => ("windows-x64", "windows-x64-embedder.zip"),
+        let platform = match self.target.as_str() {
+            "x86_64-unknown-linux-gnu" => format!("linux_x64-host_{}", build),
+            "armv7-linux-androideabi" => format!("linux_x64-android_{}", build),
+            "aarch64-linux-android" => format!("linux_x64-android_{}_arm64", build),
+            "i686-linux-android" => format!("linux_x64-android_{}_x64", build),
+            "x86_64-linux-android" => format!("linux_x64-android_{}_x86", build),
+            "x86_64-apple-darwin" => format!("macosx_x64-host_{}", build),
+            //"x86_64-pc-windows-msvc" => format!("windows_x64-host_{}", build),
             _ => panic!("unsupported platform"),
         };
         format!(
-            "https://github.com/flutter-rs/engine-builds/releases/download/f_{}/{}",
-            &self.version, file
+            "https://github.com/flutter-rs/engine-builds/releases/download/f-{0}-{1}/engine-{1}",
+            &self.version, platform
         )
     }
 
@@ -76,7 +76,6 @@ impl Engine {
                 .join(&self.version)
                 .join(&self.target)
                 .join(self.build.build())
-                .join("engine_out")
                 .join(self.library_name())
         };
         path
@@ -85,7 +84,7 @@ impl Engine {
     pub fn download(&self) {
         let url = self.download_url();
         let path = self.engine_path();
-        let dir = path.parent().unwrap().parent().unwrap().to_owned();
+        let dir = path.parent().unwrap().to_owned();
 
         if path.exists() {
             return;
@@ -135,6 +134,14 @@ impl Engine {
     pub fn latest_version() -> Result<String, Error> {
         let mut req =
             ureq::get("https://api.github.com/repos/flutter-rs/engine-builds/releases/latest");
-        Ok(req.call().into_json()?["tag_name"].as_str().unwrap()[2..].to_string())
+        let tag_name = &req.call().into_json()?["tag_name"];
+        let version = tag_name
+            .as_str()
+            .unwrap()
+            .split('-')
+            .nth(1)
+            .unwrap()
+            .to_string();
+        Ok(version)
     }
 }

@@ -79,10 +79,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_default();
     let flutter = Flutter::new()?;
     let engine_version = metadata.engine_version().unwrap_or_else(|| {
-        std::env::var("FLUTTER_ENGINE_VERSION").ok().unwrap_or_else(|| {
-            //flutter.engine_version().unwrap()
-            Engine::latest_version().unwrap()
-        })
+        std::env::var("FLUTTER_ENGINE_VERSION")
+            .ok()
+            .unwrap_or_else(|| {
+                //flutter.engine_version().unwrap()
+                Engine::latest_version().unwrap()
+            })
     });
 
     log::debug!("FLUTTER_ROOT {}", flutter.root().display());
