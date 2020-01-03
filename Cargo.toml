@@ -9,6 +9,7 @@ repository = "https://github.com/flutter-rs/cargo-flutter"
 
 [dependencies]
 cargo = "0.41.0"
+cargo-apk = { path = "../android-rs-glue/cargo-apk" }
 clap = "2.33.0"
 copy_dir = "0.1.2"
 curl = { version = "0.4.25", features = ["http2"] }
