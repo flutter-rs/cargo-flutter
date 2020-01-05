@@ -1,6 +1,8 @@
+use cargo::core::compiler::ProfileKind;
 use cargo::util::Config;
+use cargo_flutter::package::apk::Apk;
 use cargo_flutter::package::appimage::AppImage;
-use cargo_flutter::{Build, Cargo, Engine, Error, Flutter, Package, TomlConfig};
+use cargo_flutter::{Build, Cargo, Engine, Error, Flutter, Item, Package, TomlConfig};
 use clap::{App, AppSettings, Arg, SubCommand};
 use std::{env, str};
 
@@ -73,8 +75,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .values_of("cargo-args")
         .expect("cargo-args to not be null")
         .collect();
-    let cargo_config = Config::default()?;
-    let cargo = Cargo::new(&cargo_config, cargo_args)?;
+    let mut cargo_config = Config::default()?;
+    let cargo = Cargo::new(&mut cargo_config, cargo_args)?;
+
     let build = if cargo.release() {
         Build::Release
     } else {
@@ -101,15 +104,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::debug!("FLUTTER_ROOT {}", flutter.root().display());
     log::debug!("FLUTTER_ENGINE_VERSION {}", engine_version);
 
-    let engine = Engine::new(engine_version, cargo.triple()?, build);
-    let engine_path = engine.engine_path();
+    let triple = cargo.triple()?;
+    let engine = Engine::new(engine_version, triple.clone(), build);
     let flutter_asset_dir = cargo.build_dir().join("flutter_assets");
     let snapshot_path = cargo.build_dir().join("app.so");
+    let engine_path_orig = engine.engine_path();
+    let engine_path = cargo.build_dir().join("deps").join(engine.library_name());
 
-    log::debug!("FLUTTER_ENGINE_PATH {}", engine_path.display());
+    log::debug!("FLUTTER_ENGINE_PATH {}", engine.engine_path().display());
     log::debug!("FLUTTER_ASSET_DIR {}", flutter_asset_dir.display());
 
     engine.download();
+
+    if !engine_path.exists() {
+        std::fs::create_dir_all(engine_path.parent().unwrap())?;
+        std::fs::copy(&engine_path_orig, &engine_path)?;
+    }
 
     if config.is_some() {
         if !matches.is_present("no-flutter") && !matches.is_present("no-bundle") {
@@ -119,43 +129,77 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if !matches.is_present("no-flutter") && !matches.is_present("no-aot") {
             if aot {
-                flutter.aot(&cargo, &engine_path)?;
+                flutter.aot(&cargo, &engine_path_orig)?;
             }
         }
     }
 
     match (cargo.cmd(), config) {
         ("build", Some(config)) => {
-            cargo.build(&engine_path)?;
+            let mut package = Package::new(&config.package.name);
+            package.add_lib(engine_path);
+            if aot {
+                package.add_lib(snapshot_path);
+            }
+            package.add_asset(flutter_asset_dir);
 
-            if let Some(format) = matches.value_of("format") {
-                let mut package = Package::new(&config.package.name);
+            if !triple.contains("android") {
+                cargo.build()?;
                 package.add_bin(cargo.build_dir().join(&config.package.name));
-                package.add_lib(engine_path);
-                if aot {
-                    package.add_lib(snapshot_path);
-                }
-                package.add_asset(flutter_asset_dir);
-                match format {
-                    "appimage" => {
-                        let builder = AppImage::new(metadata.appimage.unwrap_or_default());
-                        builder.build(&cargo, &package, sign)?;
+
+                if let Some(format) = matches.value_of("format") {
+                    match format {
+                        "appimage" => {
+                            let builder = AppImage::new(metadata.appimage.unwrap_or_default());
+                            builder.build(&cargo, &package, sign)?;
+                        }
+                        _ => Err(Error::FormatNotSupported)?,
                     }
-                    _ => Err(Error::FormatNotSupported)?,
                 }
+            } else {
+                use cargo_apk::config::AndroidBuildTarget;
+                let mut android_config = cargo_apk::config::load(cargo.package()?).unwrap();
+                let target = match triple.as_str() {
+                    "armv7-linux-androideabi" => AndroidBuildTarget::ArmV7a,
+                    "aarch64-linux-android" => AndroidBuildTarget::Arm64V8a,
+                    "i686-linux-android" => AndroidBuildTarget::X86,
+                    "x86_64-linux-android" => AndroidBuildTarget::X86_64,
+                    _ => panic!("unsupported android target"),
+                };
+                android_config.build_targets = vec![target];
+                android_config.release = build != Build::Debug;
+                let libs = cargo_apk::build_shared_libraries(
+                    cargo.workspace(),
+                    &android_config,
+                    &matches,
+                    &cargo.build_dir(),
+                    Some(if build == Build::Debug {
+                        ProfileKind::Dev
+                    } else {
+                        ProfileKind::Release
+                    }),
+                    vec![],
+                )?;
+                for (_, libs) in libs.shared_libraries.iter_all() {
+                    for lib in libs {
+                        package.add_lib(Item::new(lib.path.clone(), lib.filename.clone()));
+                    }
+                }
+                let builder = Apk::new(android_config);
+                builder.build(&cargo, &package, sign, target)?;
             }
         }
         ("run", Some(_config)) => {
             std::env::set_var("FLUTTER_AOT_SNAPSHOT", &snapshot_path);
             std::env::set_var("FLUTTER_ASSET_DIR", &flutter_asset_dir);
-            let debug_uri = cargo.run(&engine_path)?;
+            let debug_uri = cargo.run()?;
             log::info!("Observatory at {}", debug_uri);
 
             if !matches.is_present("no-flutter") && !matches.is_present("no-attach") {
                 flutter.attach(&cargo, &debug_uri)?;
             }
         }
-        _ => cargo.build(&engine_path)?,
+        _ => cargo.build()?,
     }
 
     Ok(())

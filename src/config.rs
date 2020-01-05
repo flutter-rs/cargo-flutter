@@ -16,6 +16,7 @@ pub struct TomlPackage {
 #[derive(Debug, Default, Clone, Deserialize)]
 pub struct TomlMetadata {
     pub flutter: Option<TomlFlutter>,
+    pub apk: Option<crate::package::apk::TomlApk>,
     pub appimage: Option<crate::package::appimage::TomlAppImage>,
 }
 
@@ -26,16 +27,7 @@ pub struct TomlFlutter {
 
 impl TomlConfig {
     pub fn load(cargo: &Cargo) -> Result<Self, Error> {
-        let package = if let Some(package) = cargo.package() {
-            cargo
-                .workspace()
-                .members()
-                .find(|pkg| pkg.name().as_str() == package)
-                .ok_or(Error::PackageNotMember)?
-        } else {
-            cargo.workspace().current()?
-        };
-
+        let package = cargo.package()?;
         let bytes = std::fs::read(package.manifest_path())?;
         let string = std::str::from_utf8(&bytes)?;
         Ok(toml::from_str(string)?)

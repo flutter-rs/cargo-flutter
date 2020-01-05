@@ -49,20 +49,20 @@ impl AppImage {
 
         let bin_dir = appimage_dir.join("usr").join("bin");
         std::fs::create_dir_all(&bin_dir)?;
-        for bin in &package.bin {
-            std::fs::copy(bin, bin_dir.join(bin.file_name().unwrap()))?;
+        for bin in package.bins() {
+            std::fs::copy(bin.path(), bin_dir.join(bin.name()))?;
         }
 
         let lib_dir = appimage_dir.join("usr").join("lib");
         std::fs::create_dir_all(&lib_dir)?;
-        for lib in &package.lib {
-            std::fs::copy(lib, lib_dir.join(lib.file_name().unwrap()))?;
+        for lib in package.libs() {
+            std::fs::copy(lib.path(), lib_dir.join(lib.name()))?;
         }
 
         let asset_dir = appimage_dir.join("usr").join("share");
         std::fs::create_dir_all(&asset_dir)?;
-        for asset in &package.asset {
-            copy_dir::copy_dir(asset, asset_dir.join(asset.file_name().unwrap()))?;
+        for asset in package.assets() {
+            copy_dir::copy_dir(asset.path(), asset_dir.join(asset.name()))?;
         }
 
         let apprun = appimage_dir.join("AppRun");

@@ -1,9 +1,9 @@
 use crate::error::Error;
-use cargo::core::Workspace;
+use cargo::core::{Package, Workspace};
 use cargo::util::important_paths::find_root_manifest_for_wd;
 use cargo::util::Config;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 pub struct Cargo<'a> {
@@ -12,8 +12,17 @@ pub struct Cargo<'a> {
 }
 
 impl<'a> Cargo<'a> {
-    pub fn new(config: &'a Config, args: Vec<&'a str>) -> Result<Self, Error> {
+    pub fn new(config: &'a mut Config, args: Vec<&'a str>) -> Result<Self, Error> {
         let root_manifest = find_root_manifest_for_wd(config.cwd())?;
+        let target_dir = root_manifest
+            .parent()
+            .unwrap()
+            .join("target")
+            .join("flutter");
+        config
+            .configure(0, None, &None, false, false, false, &Some(target_dir), &[])
+            .unwrap();
+
         let workspace = Workspace::new(&root_manifest, config)?;
         Ok(Self { args, workspace })
     }
@@ -35,8 +44,17 @@ impl<'a> Cargo<'a> {
         self.arg(|f| f == "--target")
     }
 
-    pub fn package(&self) -> Option<&str> {
-        self.arg(|f| f == "--package" || f == "-p")
+    pub fn package(&self) -> Result<&Package, Error> {
+        Ok(
+            if let Some(package) = self.arg(|f| f == "--package" || f == "-p") {
+                self.workspace()
+                    .members()
+                    .find(|pkg| pkg.name().as_str() == package)
+                    .ok_or(Error::PackageNotMember)?
+            } else {
+                self.workspace().current()?
+            },
+        )
     }
 
     pub fn release(&self) -> bool {
@@ -67,12 +85,8 @@ impl<'a> Cargo<'a> {
         self.workspace().target_dir().into_path_unlocked()
     }
 
-    pub fn flutter_dir(&self) -> PathBuf {
-        self.target_dir().join("flutter")
-    }
-
     pub fn build_dir(&self) -> PathBuf {
-        let flutter_dir = self.flutter_dir();
+        let flutter_dir = self.target_dir();
         let triple_dir = if let Some(target) = self.target() {
             flutter_dir.join(target)
         } else {
@@ -85,34 +99,26 @@ impl<'a> Cargo<'a> {
         }
     }
 
-    fn cargo_command(&self, engine_path: &Path) -> Command {
-        let engine_dir = engine_path.parent().unwrap();
-        let rpath = if !self.release() {
-            format!(" -Clink-arg=-Wl,-rpath={}", engine_dir.display())
-        } else {
-            "".to_string()
-        };
-        let rustflags = format!("-Clink-arg=-L{}{}", engine_dir.display(), rpath);
+    fn cargo_command(&self) -> Command {
         let mut cmd = Command::new("cargo");
         cmd.current_dir(self.workspace.config().cwd())
-            .env("RUSTFLAGS", rustflags)
             .args(&self.args)
             .arg("--target-dir")
-            .arg(self.flutter_dir());
+            .arg(self.target_dir());
         cmd
     }
 
-    pub fn build(&self, engine_path: &Path) -> Result<(), Error> {
-        let status = self.cargo_command(engine_path).status().expect("Success");
+    pub fn build(&self) -> Result<(), Error> {
+        let status = self.cargo_command().status().expect("Success");
         if status.code() != Some(0) {
             return Err(Error::CargoError);
         }
         Ok(())
     }
 
-    pub fn run(&self, engine_path: &Path) -> Result<String, Error> {
+    pub fn run(&self) -> Result<String, Error> {
         let mut child = self
-            .cargo_command(engine_path)
+            .cargo_command()
             .stdout(Stdio::piped())
             .spawn()
             .expect("Success");

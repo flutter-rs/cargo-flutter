@@ -60,6 +60,10 @@ impl Engine {
     pub fn library_name(&self) -> &'static str {
         match self.target.as_str() {
             "x86_64-unknown-linux-gnu" => "libflutter_engine.so",
+            "armv7-linux-androideabi" => "libflutter_engine.so",
+            "aarch64-linux-android" => "libflutter_engine.so",
+            "i686-linux-android" => "libflutter_engine.so",
+            "x86_64-linux-android" => "libflutter_engine.so",
             "x86_64-apple-darwin" => "FlutterEmbedder.framework",
             "x86_64-pc-windows-msvc" => "flutter_engine.dll",
             _ => panic!("unsupported platform"),
