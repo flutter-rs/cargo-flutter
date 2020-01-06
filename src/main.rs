@@ -96,8 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::var("FLUTTER_ENGINE_VERSION")
             .ok()
             .unwrap_or_else(|| {
-                //flutter.engine_version().unwrap()
-                Engine::latest_version().unwrap()
+                flutter.engine_version().unwrap()
             })
     });
 
