@@ -78,16 +78,27 @@ impl Flutter {
         Ok(())
     }
 
-    pub fn aot(&self, cargo: &Cargo, engine_path: &Path) -> Result<(), Error> {
+    pub fn aot(
+        &self,
+        cargo: &Cargo,
+        host_engine_path: &Path,
+        target_engine_path: &Path,
+    ) -> Result<(), Error> {
         let root = cargo.workspace().root();
         let build_dir = cargo.build_dir();
-        let engine_dir = engine_path.parent().unwrap();
+        let host_engine_dir = host_engine_path.parent().unwrap();
+        let target_engine_dir = target_engine_path.parent().unwrap();
         let snapshot = build_dir.join("kernel_snapshot.dill");
-        let status = Command::new(engine_dir.join("dart"))
+
+        let status = Command::new(host_engine_dir.join("dart"))
             .current_dir(root)
-            .arg(engine_dir.join("gen").join("frontend_server.dart.snapshot"))
+            .arg(
+                host_engine_dir
+                    .join("gen")
+                    .join("frontend_server.dart.snapshot"),
+            )
             .arg("--sdk-root")
-            .arg(engine_dir.join("flutter_patched_sdk"))
+            .arg(host_engine_dir.join("flutter_patched_sdk"))
             .arg("--target=flutter")
             .arg("--aot")
             .arg("--tfa")
@@ -99,10 +110,22 @@ impl Flutter {
             .arg(root.join("lib").join("main.dart"))
             .status()
             .expect("Success");
+
         if status.code() != Some(0) {
             return Err(Error::FlutterError);
         }
-        let status = Command::new(engine_dir.join("gen_snapshot"))
+
+        let gen_snapshot = target_engine_dir.join("gen_snapshot");
+        let gen_snapshot_x64 = target_engine_dir.join("gen_snapshot_x64");
+        let gen_snapshot_path = if gen_snapshot.exists() {
+            gen_snapshot
+        } else if gen_snapshot_x64.exists() {
+            gen_snapshot_x64
+        } else {
+            return Err(Error::GenSnapshotNotFound);
+        };
+
+        let status = Command::new(gen_snapshot_path)
             .current_dir(root)
             .arg("--causal_async_stacks")
             .arg("--deterministic")
@@ -112,9 +135,11 @@ impl Flutter {
             .arg(&snapshot)
             .status()
             .expect("Success");
+
         if status.code() != Some(0) {
             return Err(Error::FlutterError);
         }
+
         Ok(())
     }
 }

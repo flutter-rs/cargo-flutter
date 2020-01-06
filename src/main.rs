@@ -105,10 +105,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::debug!("FLUTTER_ENGINE_VERSION {}", engine_version);
 
     let triple = cargo.triple()?;
-    let engine = Engine::new(engine_version, triple.clone(), build);
+    let engine = Engine::new(engine_version.clone(), triple.clone(), build);
     let flutter_asset_dir = cargo.build_dir().join("flutter_assets");
     let snapshot_path = cargo.build_dir().join("app.so");
-    let engine_path_orig = engine.engine_path();
     let engine_path = cargo.build_dir().join("deps").join(engine.library_name());
 
     log::debug!("FLUTTER_ENGINE_PATH {}", engine.engine_path().display());
@@ -118,7 +117,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if !engine_path.exists() {
         std::fs::create_dir_all(engine_path.parent().unwrap())?;
-        std::fs::copy(&engine_path_orig, &engine_path)?;
+        std::fs::copy(engine.engine_path(), &engine_path)?;
     }
 
     if config.is_some() {
@@ -128,8 +127,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         if !matches.is_present("no-flutter") && !matches.is_present("no-aot") {
+            let host_triple = cargo.host_target()?;
+            let host_engine = Engine::new(engine_version, host_triple, build);
+            host_engine.download();
+
             if aot {
-                flutter.aot(&cargo, &engine_path_orig)?;
+                flutter.aot(&cargo, &host_engine.engine_path(), &engine.engine_path())?;
             }
         }
     }
