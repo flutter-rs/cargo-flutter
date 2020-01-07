@@ -1,6 +1,6 @@
 [package]
 name = "cargo-flutter"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["David Craven <david@craven.ch>"]
 edition = "2018"
 description = "Tool for building flutter-rs projects."
@@ -9,13 +9,13 @@ repository = "https://github.com/flutter-rs/cargo-flutter"
 
 [dependencies]
 cargo = "0.41.0"
-cargo-apk = { git = "https://github.com/dvc94ch/android-rs-glue" }
 clap = "2.33.0"
 copy_dir = "0.1.2"
 curl = { version = "0.4.25", features = ["http2"] }
 dirs = "2.0.2"
 env_logger = "0.7.1"
 failure = "0.1.6"
+lib-cargo-apk = "0.5.0"
 log = "0.4.8"
 serde = { version = "1.0.104", features = ["derive"] }
 toml = "0.5.5"

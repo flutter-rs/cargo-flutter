@@ -95,9 +95,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let engine_version = metadata.engine_version().unwrap_or_else(|| {
         std::env::var("FLUTTER_ENGINE_VERSION")
             .ok()
-            .unwrap_or_else(|| {
-                flutter.engine_version().unwrap()
-            })
+            .unwrap_or_else(|| flutter.engine_version().unwrap())
     });
 
     log::debug!("FLUTTER_ROOT {}", flutter.root().display());
@@ -159,8 +157,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             } else {
-                use cargo_apk::config::AndroidBuildTarget;
-                let mut android_config = cargo_apk::config::load(cargo.package()?).unwrap();
+                use lib_cargo_apk::config::AndroidBuildTarget;
+                let mut android_config = lib_cargo_apk::config::load(cargo.package()?).unwrap();
                 let target = match triple.as_str() {
                     "armv7-linux-androideabi" => AndroidBuildTarget::ArmV7a,
                     "aarch64-linux-android" => AndroidBuildTarget::Arm64V8a,
@@ -170,7 +168,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 };
                 android_config.build_targets = vec![target];
                 android_config.release = build != Build::Debug;
-                let libs = cargo_apk::build_shared_libraries(
+                let libs = lib_cargo_apk::build_shared_libraries(
                     cargo.workspace(),
                     &android_config,
                     &matches,

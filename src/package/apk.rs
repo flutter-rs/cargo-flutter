@@ -1,7 +1,9 @@
 use crate::cargo::Cargo;
 use crate::package::Package;
 use cargo::core::manifest::TargetKind;
-use cargo_apk::{AndroidBuildTarget, AndroidConfig, BuildTarget, SharedLibraries, SharedLibrary};
+use lib_cargo_apk::{
+    AndroidBuildTarget, AndroidConfig, BuildTarget, SharedLibraries, SharedLibrary,
+};
 use serde::Deserialize;
 
 #[derive(Debug, Default, Clone, Deserialize)]
@@ -41,7 +43,7 @@ impl Apk {
             );
         }
 
-        cargo_apk::build_apks(&config, &cargo.build_dir(), libs)?;
+        lib_cargo_apk::build_apks(&config, &cargo.build_dir(), libs)?;
         Ok(())
     }
 }
