@@ -205,6 +205,7 @@ dependencies = [
 [[package]]
 name = "cargo-apk"
 version = "0.4.3"
+source = "git+https://github.com/dvc94ch/android-rs-glue#5290cc46edb0c5a0cdf031bd0fbc9a709ef45008"
 dependencies = [
  "cargo 0.41.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -221,7 +222,7 @@ name = "cargo-flutter"
 version = "0.1.1"
 dependencies = [
  "cargo 0.41.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "cargo-apk 0.4.3",
+ "cargo-apk 0.4.3 (git+https://github.com/dvc94ch/android-rs-glue)",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "copy_dir 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "curl 0.4.25 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1653,6 +1654,7 @@ dependencies = [
 "checksum bzip2-sys 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "6584aa36f5ad4c9247f5323b0a42f37802b37a836f0ad87084d7a33961abe25f"
 "checksum c2-chacha 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "214238caa1bf3a496ec3392968969cab8549f96ff30652c9e56885329315f6bb"
 "checksum cargo 0.41.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2737475f76ce9681e230a4e5cb2476fb133875f28fd84a834a6b5aefd83d3741"
+"checksum cargo-apk 0.4.3 (git+https://github.com/dvc94ch/android-rs-glue)" = "<none>"
 "checksum cargo-platform 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e78cce7683c0998d7a11405dcd13e31b23a930d4b5bba9e4245bdfba6bcd462c"
 "checksum cc 1.0.48 (registry+https://github.com/rust-lang/crates.io-index)" = "f52a465a666ca3d838ebbf08b241383421412fe7ebb463527bba275526d89f76"
 "checksum cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)" = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"

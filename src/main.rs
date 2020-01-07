@@ -180,7 +180,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } else {
                         ProfileKind::Release
                     }),
-                    vec![],
+                    &[],
                 )?;
                 for (_, libs) in libs.shared_libraries.iter_all() {
                     for lib in libs {
