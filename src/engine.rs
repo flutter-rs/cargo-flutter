@@ -48,7 +48,9 @@ impl Engine {
             "i686-linux-android" => format!("linux_x64-android_{}_x64", build),
             "x86_64-linux-android" => format!("linux_x64-android_{}_x86", build),
             "x86_64-apple-darwin" => format!("macosx_x64-host_{}", build),
-            //"x86_64-pc-windows-msvc" => format!("windows_x64-host_{}", build),
+            "armv7-apple-ios" => format!("macosx_x64-ios_{}_arm", build),
+            "aarch64-apple-ios" => format!("macosx_x64-ios_{}", build),
+            "x86_64-pc-windows-msvc" => format!("windows_x64-host_{}", build),
             _ => panic!("unsupported platform"),
         };
         format!(
@@ -64,7 +66,9 @@ impl Engine {
             "aarch64-linux-android" => "libflutter_engine.so",
             "i686-linux-android" => "libflutter_engine.so",
             "x86_64-linux-android" => "libflutter_engine.so",
-            "x86_64-apple-darwin" => "FlutterEmbedder.framework",
+            "x86_64-apple-darwin" => "libflutter_engine.dylib",
+            "armv7-apple-ios" => "libflutter_engine.dylib",
+            "aarch64-apple-ios" => "libflutter_engine.dylib",
             "x86_64-pc-windows-msvc" => "flutter_engine.dll",
             _ => panic!("unsupported platform"),
         }
