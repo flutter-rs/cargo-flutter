@@ -1,9 +1,7 @@
 use crate::cargo::Cargo;
 use crate::package::Package;
 use cargo::core::manifest::TargetKind;
-use lib_cargo_apk::{
-    AndroidBuildTarget, AndroidConfig, BuildTarget, SharedLibraries, SharedLibrary,
-};
+use lib_cargo_apk::{AndroidConfig, BuildTarget, SharedLibraries, SharedLibrary};
 use serde::Deserialize;
 
 #[derive(Debug, Default, Clone, Deserialize)]
@@ -23,7 +21,6 @@ impl Apk {
         cargo: &Cargo,
         package: &Package,
         _sign: bool,
-        abi: AndroidBuildTarget,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut config = self.toml.clone();
         config.default_target_config.assets =
@@ -36,7 +33,7 @@ impl Apk {
             libs.shared_libraries.insert(
                 target.clone(),
                 SharedLibrary {
-                    abi,
+                    abi: self.toml.build_targets[0],
                     path: lib.path().to_owned(),
                     filename: lib.name().to_owned(),
                 },

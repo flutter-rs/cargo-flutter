@@ -1,4 +1,5 @@
-use cargo::core::compiler::ProfileKind;
+use cargo::core::compiler::{CompileMode, ProfileKind};
+use cargo::ops::{CompileOptions, Packages};
 use cargo::util::Config;
 use cargo_flutter::package::apk::Apk;
 use cargo_flutter::package::appimage::AppImage;
@@ -168,25 +169,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 };
                 android_config.build_targets = vec![target];
                 android_config.release = build != Build::Debug;
+
+                let mut options =
+                    CompileOptions::new(cargo.workspace().config(), CompileMode::Build)?;
+                options.build_config.profile_kind = if build == Build::Debug {
+                    ProfileKind::Dev
+                } else {
+                    ProfileKind::Release
+                };
+                options.spec = if let Some(package) = cargo.package().ok() {
+                    Packages::Packages(vec![package.name().to_string()])
+                } else {
+                    Packages::Default
+                };
+
                 let libs = lib_cargo_apk::build_shared_libraries(
                     cargo.workspace(),
                     &android_config,
-                    &matches,
+                    options,
                     &cargo.build_dir(),
-                    Some(if build == Build::Debug {
-                        ProfileKind::Dev
-                    } else {
-                        ProfileKind::Release
-                    }),
-                    &[],
                 )?;
                 for (_, libs) in libs.shared_libraries.iter_all() {
                     for lib in libs {
                         package.add_lib(Item::new(lib.path.clone(), lib.filename.clone()));
                     }
                 }
-                let builder = Apk::new(android_config);
-                builder.build(&cargo, &package, sign, target)?;
+                if let Some(format) = matches.value_of("format") {
+                    if format != "apk" {
+                        Err(Error::FormatNotSupported)?
+                    }
+                    let builder = Apk::new(android_config);
+                    builder.build(&cargo, &package, sign)?;
+                }
             }
         }
         ("run", Some(_config)) => {
