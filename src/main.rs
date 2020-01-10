@@ -19,12 +19,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .author("flutter-rs")
                 .about("Provides a smooth experience for developing flutter-rs apps.")
                 .arg(
-                    Arg::with_name("format")
-                        .short("f")
-                        .long("format")
-                        .value_name("FORMAT")
-                        .takes_value(true)
-                        .help("Packaging format"),
+                    Arg::with_name("quiet")
+                        .long("quiet")
+                        .help("avoids excessive printing to stdout")
                 )
                 .arg(
                     Arg::with_name("no-flutter")
@@ -45,6 +42,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Arg::with_name("no-aot")
                         .long("no-aot")
                         .help("Skips creating aot blob"),
+                )
+                .arg(
+                    Arg::with_name("format")
+                        .short("f")
+                        .long("format")
+                        .value_name("FORMAT")
+                        .takes_value(true)
+                        .help("Packaging format"),
                 )
                 .arg(
                     Arg::with_name("sign")
@@ -72,6 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err(Error::NotCalledWithCargo.into());
     };
 
+    let quiet = matches.is_present("quiet");
     let cargo_args: Vec<&str> = matches
         .values_of("cargo-args")
         .expect("cargo-args to not be null")
@@ -111,7 +117,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::debug!("FLUTTER_ENGINE_PATH {}", engine.engine_path().display());
     log::debug!("FLUTTER_ASSET_DIR {}", flutter_asset_dir.display());
 
-    engine.download();
+    engine.download(quiet);
 
     if !engine_path.exists() {
         std::fs::create_dir_all(engine_path.parent().unwrap())?;
@@ -127,7 +133,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if !matches.is_present("no-flutter") && !matches.is_present("no-aot") {
             let host_triple = cargo.host_target()?;
             let host_engine = Engine::new(engine_version, host_triple, build);
-            host_engine.download();
+            host_engine.download(quiet);
 
             if aot {
                 flutter.aot(&cargo, &host_engine.engine_path(), &engine.engine_path())?;

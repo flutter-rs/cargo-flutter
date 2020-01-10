@@ -89,7 +89,7 @@ impl Engine {
         path
     }
 
-    pub fn download(&self) {
+    pub fn download(&self, quiet: bool) {
         let url = self.download_url();
         let path = self.engine_path();
         let dir = path.parent().unwrap().to_owned();
@@ -135,7 +135,9 @@ impl Engine {
             crate::unzip::unzip(&download_file, &dir).unwrap();
         });
         for (total, done) in rx.iter() {
-            println!("Downloading flutter engine {} of {}", done, total);
+            if !quiet {
+                println!("Downloading flutter engine {} of {}", done, total);
+            }
         }
     }
 
