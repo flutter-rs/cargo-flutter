@@ -210,7 +210,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-flutter"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "cargo 0.41.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
