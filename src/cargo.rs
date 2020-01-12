@@ -31,9 +31,9 @@ impl<'a> Cargo<'a> {
         self.args
             .iter()
             .position(|f| matches(f))
-            .map(|pos| self.args.iter().nth(pos + 1))
+            .map(|pos| self.args.get(pos + 1))
             .unwrap_or_default()
-            .map(|v| *v)
+            .cloned()
     }
 
     pub fn cmd(&self) -> &str {
@@ -58,7 +58,7 @@ impl<'a> Cargo<'a> {
     }
 
     pub fn release(&self) -> bool {
-        self.args.iter().find(|f| **f == "--release").is_some()
+        self.args.iter().any(|f| *f == "--release")
     }
 
     pub fn host_target(&self) -> Result<String, Error> {

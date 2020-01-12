@@ -75,7 +75,7 @@ impl Engine {
     }
 
     pub fn engine_path(&self) -> PathBuf {
-        let path = if let Ok(path) = std::env::var("FLUTTER_ENGINE_PATH") {
+        if let Ok(path) = std::env::var("FLUTTER_ENGINE_PATH") {
             PathBuf::from(path)
         } else {
             dirs::cache_dir()
@@ -85,8 +85,7 @@ impl Engine {
                 .join(&self.target)
                 .join(self.build.build())
                 .join(self.library_name())
-        };
-        path
+        }
     }
 
     pub fn download(&self, quiet: bool) {
