@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .arg(
                     Arg::with_name("quiet")
                         .long("quiet")
-                        .help("avoids excessive printing to stdout")
+                        .help("avoids excessive printing to stdout"),
                 )
                 .arg(
                     Arg::with_name("no-flutter")
@@ -160,7 +160,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let builder = AppImage::new(metadata.appimage.unwrap_or_default());
                             builder.build(&cargo, &package, sign)?;
                         }
-                        _ => Err(Error::FormatNotSupported)?,
+                        _ => return Err(Error::FormatNotSupported.into()),
                     }
                 }
             } else {
@@ -183,7 +183,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 } else {
                     ProfileKind::Release
                 };
-                options.spec = if let Some(package) = cargo.package().ok() {
+                options.spec = if let Ok(package) = cargo.package() {
                     Packages::Packages(vec![package.name().to_string()])
                 } else {
                     Packages::Default
@@ -202,7 +202,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if let Some(format) = matches.value_of("format") {
                     if format != "apk" {
-                        Err(Error::FormatNotSupported)?
+                        return Err(Error::FormatNotSupported.into());
                     }
                     let builder = Apk::new(android_config);
                     builder.build(&cargo, &package, sign)?;
