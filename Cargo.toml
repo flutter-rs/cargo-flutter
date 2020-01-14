@@ -1,6 +1,6 @@
 [package]
 name = "cargo-flutter"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["David Craven <david@craven.ch>"]
 edition = "2018"
 description = "Tool for building flutter-rs projects."

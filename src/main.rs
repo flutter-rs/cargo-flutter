@@ -122,11 +122,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !engine_path.exists() {
         std::fs::create_dir_all(engine_path.parent().unwrap())?;
         std::fs::copy(engine.engine_path(), &engine_path)?;
+
         if triple == "x86_64-pc-windows-msvc" {
-            std::fs::copy(
-                engine.engine_path().parent().unwrap().join("flutter_engine.dll.lib"),
-                engine_path.parent().unwrap().join("flutter_engine.dll.lib"),
-            )?;
+            let from_dir = engine.engine_path().parent().unwrap().to_owned();
+            let to_dir = engine_path.parent().unwrap();
+            for file in &[
+                "flutter_engine.dll.lib",
+                "flutter_engine.dll.exp",
+                "flutter_engine.dll.pdb",
+            ] {
+                std::fs::copy(from_dir.join(file), to_dir.join(file))?;
+            }
         }
     }
 
