@@ -115,17 +115,19 @@ impl Flutter {
             return Err(Error::FlutterError);
         }
 
-        let gen_snapshot = target_engine_dir.join("gen_snapshot");
-        let gen_snapshot_x64 = target_engine_dir.join("gen_snapshot_x64");
-        let gen_snapshot_path = if gen_snapshot.exists() {
-            gen_snapshot
-        } else if gen_snapshot_x64.exists() {
-            gen_snapshot_x64
-        } else {
-            return Err(Error::GenSnapshotNotFound);
-        };
+        let gen_snapshot = [
+            "gen_snapshot",
+            "gen_snapshot_x64",
+            "gen_snapshot_x86",
+            "gen_snapshot_host_targeting_host",
+        ]
+        .iter()
+        .map(|bin| target_engine_dir.join(bin))
+        .filter(|path| path.exists())
+        .next()
+        .ok_or(Error::GenSnapshotNotFound)?;
 
-        let status = Command::new(gen_snapshot_path)
+        let status = Command::new(gen_snapshot)
             .current_dir(root)
             .arg("--causal_async_stacks")
             .arg("--deterministic")
