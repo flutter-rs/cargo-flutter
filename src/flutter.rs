@@ -123,8 +123,7 @@ impl Flutter {
         ]
         .iter()
         .map(|bin| target_engine_dir.join(bin))
-        .filter(|path| path.exists())
-        .next()
+        .find(|path| path.exists())
         .ok_or(Error::GenSnapshotNotFound)?;
 
         let status = Command::new(gen_snapshot)

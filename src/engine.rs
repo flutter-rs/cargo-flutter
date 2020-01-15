@@ -1,9 +1,8 @@
-use crate::error::Error;
 use curl::easy::Easy;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::{mpsc, Mutex};
+use std::sync::mpsc;
 use std::{fs, thread};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -54,7 +53,7 @@ impl Engine {
             _ => panic!("unsupported platform"),
         };
         format!(
-            "https://github.com/flutter-rs/engine-builds/releases/download/f-{0}-{1}/engine-{1}",
+            "https://github.com/flutter-rs/engine-builds/releases/download/f-{0}/{1}.zip",
             &self.version, platform
         )
     }
@@ -110,24 +109,26 @@ impl Engine {
             let download_file = dir.join("engine.zip");
 
             let mut file = File::create(&download_file).unwrap();
-
-            let tx = Mutex::new(tx);
+            let mut last_done = 0.0;
 
             let mut easy = Easy::new();
-
-            println!("Starting download from {}", url);
+            easy.fail_on_error(true).unwrap();
             easy.url(&url).unwrap();
             easy.follow_location(true).unwrap();
             easy.progress(true).unwrap();
             easy.progress_function(move |total, done, _, _| {
-                tx.lock().unwrap().send((total, done)).unwrap();
+                if done > last_done {
+                    last_done = done;
+                    tx.send((total, done)).unwrap();
+                }
                 true
             })
             .unwrap();
             easy.write_function(move |data| Ok(file.write(data).unwrap()))
                 .unwrap();
-            easy.perform().unwrap();
 
+            println!("Starting download from {}", url);
+            easy.perform().unwrap();
             println!("Download finished");
 
             println!("Extracting...");
@@ -138,19 +139,5 @@ impl Engine {
                 println!("Downloading flutter engine {} of {}", done, total);
             }
         }
-    }
-
-    pub fn latest_version() -> Result<String, Error> {
-        let mut req =
-            ureq::get("https://api.github.com/repos/flutter-rs/engine-builds/releases/latest");
-        let tag_name = &req.call().into_json()?["tag_name"];
-        let version = tag_name
-            .as_str()
-            .unwrap()
-            .split('-')
-            .nth(1)
-            .unwrap()
-            .to_string();
-        Ok(version)
     }
 }
