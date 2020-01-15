@@ -172,6 +172,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let builder = AppImage::new(metadata.appimage.unwrap_or_default());
                             builder.build(&cargo, &package, sign)?;
                         }
+                        "dmg" => {}
+                        "lipo" => {}
+                        "nsis" => {}
                         _ => return Err(Error::FormatNotSupported.into()),
                     }
                 }

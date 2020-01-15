@@ -13,7 +13,7 @@ impl Flutter {
         let root = if let Ok(root) = std::env::var("FLUTTER_ROOT") {
             PathBuf::from(root)
         } else {
-            let flutter = which::which("flutter").expect("flutter not found");
+            let flutter = which::which("flutter").or(Err(Error::FlutterNotFound))?;
             let flutter = std::fs::canonicalize(flutter)?;
             flutter
                 .parent()
@@ -45,7 +45,8 @@ impl Flutter {
             Build::Profile => "--profile",
         };
 
-        let status = Command::new("flutter")
+        let flutter = which::which("flutter").or(Err(Error::FlutterNotFound))?;
+        let status = Command::new(flutter)
             .current_dir(cargo.workspace().root())
             .arg("build")
             .arg("bundle")
@@ -65,7 +66,9 @@ impl Flutter {
 
     pub fn attach(&self, cargo: &Cargo, debug_uri: &str) -> Result<(), Error> {
         let debug_uri = format!("--debug-uri={}", debug_uri);
-        let status = Command::new("flutter")
+
+        let flutter = which::which("flutter").or(Err(Error::FlutterNotFound))?;
+        let status = Command::new(flutter)
             .current_dir(cargo.workspace().root())
             .arg("attach")
             .arg("--device-id=flutter-tester")
@@ -90,7 +93,13 @@ impl Flutter {
         let target_engine_dir = target_engine_path.parent().unwrap();
         let snapshot = build_dir.join("kernel_snapshot.dill");
 
-        let status = Command::new(host_engine_dir.join("dart"))
+        let dart = ["dart", "dart.exe"]
+            .iter()
+            .map(|bin| host_engine_dir.join(bin))
+            .find(|path| path.exists())
+            .ok_or(Error::DartNotFound)?;
+
+        let status = Command::new(dart)
             .current_dir(root)
             .arg(
                 host_engine_dir
@@ -120,6 +129,7 @@ impl Flutter {
             "gen_snapshot_x64",
             "gen_snapshot_x86",
             "gen_snapshot_host_targeting_host",
+            "gen_snapshot.exe",
         ]
         .iter()
         .map(|bin| target_engine_dir.join(bin))
