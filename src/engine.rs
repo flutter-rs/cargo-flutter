@@ -1,9 +1,9 @@
+use crate::error::Error;
 use curl::easy::Easy;
+use exitfailure::ExitFailure;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::mpsc;
-use std::{fs, thread};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Engine {
@@ -87,57 +87,45 @@ impl Engine {
         }
     }
 
-    pub fn download(&self, quiet: bool) {
+    pub fn download(&self, quiet: bool) -> Result<(), ExitFailure> {
         let url = self.download_url();
         let path = self.engine_path();
         let dir = path.parent().unwrap().to_owned();
 
         if path.exists() {
-            return;
+            return Ok(());
         }
 
-        let (tx, rx) = mpsc::channel();
-        thread::spawn(move || {
-            // TODO: less unwrap, more error handling
+        std::fs::create_dir_all(&dir)?;
 
-            // Write the contents of rust-lang.org to stdout
-            tx.send((0.0, 0.0)).unwrap();
-            // create target dir
+        println!("Starting download from {}", url);
+        let download_file = dir.join("engine.zip");
+        let mut file = File::create(&download_file)?;
+        let mut last_done = 0.0;
 
-            fs::create_dir_all(&dir).unwrap();
-
-            let download_file = dir.join("engine.zip");
-
-            let mut file = File::create(&download_file).unwrap();
-            let mut last_done = 0.0;
-
-            let mut easy = Easy::new();
-            easy.fail_on_error(true).unwrap();
-            easy.url(&url).unwrap();
-            easy.follow_location(true).unwrap();
-            easy.progress(true).unwrap();
-            easy.progress_function(move |total, done, _, _| {
-                if done > last_done {
-                    last_done = done;
-                    tx.send((total, done)).unwrap();
+        let mut easy = Easy::new();
+        easy.fail_on_error(true)?;
+        easy.url(&url)?;
+        easy.follow_location(true)?;
+        easy.progress(true)?;
+        easy.progress_function(move |total, done, _, _| {
+            if done > last_done {
+                last_done = done;
+                if !quiet {
+                    println!("Downloading flutter engine {} of {}", done, total);
                 }
-                true
-            })
-            .unwrap();
-            easy.write_function(move |data| Ok(file.write(data).unwrap()))
-                .unwrap();
-
-            println!("Starting download from {}", url);
-            easy.perform().unwrap();
-            println!("Download finished");
-
-            println!("Extracting...");
-            crate::unzip::unzip(&download_file, &dir).unwrap();
-        });
-        for (total, done) in rx.iter() {
-            if !quiet {
-                println!("Downloading flutter engine {} of {}", done, total);
             }
-        }
+            true
+        })?;
+        easy.write_function(move |data| Ok(file.write(data).unwrap()))?;
+
+        easy.perform()
+            .or(Err(Error::EngineNotFound(self.version.clone())))?;
+        println!("Download finished");
+
+        println!("Extracting...");
+        crate::unzip::unzip(&download_file, &dir)?;
+
+        Ok(())
     }
 }

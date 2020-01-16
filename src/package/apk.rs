@@ -1,6 +1,7 @@
 use crate::cargo::Cargo;
 use crate::package::Package;
 use cargo::core::manifest::TargetKind;
+use failure::Error;
 use lib_cargo_apk::{AndroidConfig, BuildTarget, SharedLibraries, SharedLibrary};
 use serde::Deserialize;
 
@@ -16,12 +17,7 @@ impl Apk {
         Self { toml }
     }
 
-    pub fn build(
-        &self,
-        cargo: &Cargo,
-        package: &Package,
-        _sign: bool,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn build(&self, cargo: &Cargo, package: &Package, _sign: bool) -> Result<(), Error> {
         let mut config = self.toml.clone();
         config.default_target_config.assets =
             Some(package.assets()[0].path().to_str().unwrap().to_string());

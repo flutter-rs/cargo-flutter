@@ -5,9 +5,10 @@ use cargo_flutter::package::apk::Apk;
 use cargo_flutter::package::appimage::AppImage;
 use cargo_flutter::{Build, Cargo, Engine, Error, Flutter, Item, Package, TomlConfig};
 use clap::{App, AppSettings, Arg, SubCommand};
+use exitfailure::ExitFailure;
 use std::{env, str};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), ExitFailure> {
     env_logger::init();
 
     let app_matches = App::new("cargo-flutter")
@@ -117,7 +118,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::debug!("FLUTTER_ENGINE_PATH {}", engine.engine_path().display());
     log::debug!("FLUTTER_ASSET_DIR {}", flutter_asset_dir.display());
 
-    engine.download(quiet);
+    engine.download(quiet)?;
 
     if !engine_path.exists() {
         std::fs::create_dir_all(engine_path.parent().unwrap())?;
@@ -145,7 +146,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if !matches.is_present("no-flutter") && !matches.is_present("no-aot") {
             let host_triple = cargo.host_target()?;
             let host_engine = Engine::new(engine_version, host_triple, build);
-            host_engine.download(quiet);
+            host_engine.download(quiet)?;
 
             if aot {
                 flutter.aot(&cargo, &host_engine.engine_path(), &engine.engine_path())?;

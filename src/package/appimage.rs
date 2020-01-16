@@ -1,5 +1,6 @@
 use crate::cargo::Cargo;
 use crate::package::Package;
+use failure::Error;
 use serde::Deserialize;
 use std::fs::Permissions;
 #[cfg(unix)]
@@ -23,22 +24,12 @@ impl AppImage {
     }
 
     #[cfg(not(unix))]
-    pub fn build(
-        &self,
-        cargo: &Cargo,
-        package: &Package,
-        sign: bool,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn build(&self, cargo: &Cargo, package: &Package, sign: bool) -> Result<(), Error> {
         Err(failure::format_err!("Creating appimages only supported from a unix host.").into())
     }
 
     #[cfg(unix)]
-    pub fn build(
-        &self,
-        cargo: &Cargo,
-        package: &Package,
-        sign: bool,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn build(&self, cargo: &Cargo, package: &Package, sign: bool) -> Result<(), Error> {
         let build_dir = cargo.build_dir();
         let appimage_dir = build_dir.join("appimage");
         let name = self.toml.name.as_ref().unwrap_or(&package.name);
