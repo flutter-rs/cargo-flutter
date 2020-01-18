@@ -2,9 +2,8 @@ use crate::error::Error;
 use cargo::core::{Package, Workspace};
 use cargo::util::important_paths::find_root_manifest_for_wd;
 use cargo::util::Config;
-use std::io::Read;
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 pub struct Cargo<'a> {
     args: Vec<&'a str>,
@@ -108,7 +107,7 @@ impl<'a> Cargo<'a> {
         cmd
     }
 
-    pub fn build(&self) -> Result<(), Error> {
+    pub fn exec(&self) -> Result<(), Error> {
         let status = self.cargo_command().status().expect("Success");
         if status.code() != Some(0) {
             return Err(Error::CargoError);
@@ -116,16 +115,8 @@ impl<'a> Cargo<'a> {
         Ok(())
     }
 
-    pub fn run(&self) -> Result<String, Error> {
-        let mut child = self
-            .cargo_command()
-            .stdout(Stdio::piped())
-            .spawn()
-            .expect("Success");
-        let stdout = child.stdout.as_mut().unwrap();
-        let mut buffer = [0; 70];
-        stdout.read_exact(&mut buffer)?;
-        let string = std::str::from_utf8(&buffer)?;
-        Ok(string[34..].to_string())
+    pub fn spawn(&self) -> Result<(), Error> {
+        self.cargo_command().spawn().expect("Success");
+        Ok(())
     }
 }

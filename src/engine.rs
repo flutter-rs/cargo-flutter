@@ -120,7 +120,7 @@ impl Engine {
         easy.write_function(move |data| Ok(file.write(data).unwrap()))?;
 
         easy.perform()
-            .or(Err(Error::EngineNotFound(self.version.clone())))?;
+            .or_else(|_| Err(Error::EngineNotFound(self.version.clone())))?;
         println!("Download finished");
 
         println!("Extracting...");

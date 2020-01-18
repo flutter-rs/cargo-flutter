@@ -41,7 +41,7 @@ impl AppImage {
             .map(PathBuf::from)
             .unwrap_or_else(|| cargo.workspace().root().join("assets").join("icon.svg"));
         if !icon_path.exists() {
-            return Err(failure::format_err!("Icon not found {}", icon_path.display()).into());
+            return Err(failure::format_err!("Icon not found {}", icon_path.display()));
         }
         let icon = icon_path
             .file_stem()

@@ -42,8 +42,7 @@ engine_version = "..."
 
 You'll find the available builds on our github releases page [0].
 
-- [0] https://github.com/flutter-rs/engine-builds/releases
-"#,
+- [0] https://github.com/flutter-rs/engine-builds/releases"#,
                 version,
             ),
             Error::DartNotFound => write!(f, "Could't find dart"),

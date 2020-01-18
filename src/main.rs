@@ -6,6 +6,7 @@ use cargo_flutter::package::appimage::AppImage;
 use cargo_flutter::{Build, Cargo, Engine, Error, Flutter, Item, Package, TomlConfig};
 use clap::{App, AppSettings, Arg, SubCommand};
 use exitfailure::ExitFailure;
+use rand::Rng;
 use std::{env, str};
 
 fn main() -> Result<(), ExitFailure> {
@@ -164,7 +165,7 @@ fn main() -> Result<(), ExitFailure> {
             package.add_asset(flutter_asset_dir);
 
             if !triple.contains("android") {
-                cargo.build()?;
+                cargo.exec()?;
                 package.add_bin(cargo.build_dir().join(&config.package.name));
 
                 if let Some(format) = matches.value_of("format") {
@@ -226,16 +227,18 @@ fn main() -> Result<(), ExitFailure> {
             }
         }
         ("run", Some(_config)) => {
+            let mut rng = rand::thread_rng();
+            let port = rng.gen_range(1024, 49152);
             std::env::set_var("FLUTTER_AOT_SNAPSHOT", &snapshot_path);
             std::env::set_var("FLUTTER_ASSET_DIR", &flutter_asset_dir);
-            let debug_uri = cargo.run()?;
-            log::info!("Observatory at {}", debug_uri);
+            std::env::set_var("DART_OBSERVATORY_PORT", port.to_string());
+            cargo.spawn()?;
 
             if !matches.is_present("no-flutter") && !matches.is_present("no-attach") {
-                flutter.attach(&cargo, &debug_uri)?;
+                flutter.attach(&cargo, &format!("http://127.0.0.1:{}", port))?;
             }
         }
-        _ => cargo.build()?,
+        _ => cargo.exec()?,
     }
 
     Ok(())
