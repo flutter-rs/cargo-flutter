@@ -81,7 +81,9 @@ impl AppImage {
             appimage_dir.join(icon_path.file_name().unwrap()),
         )?;
 
-        let mut cmd = Command::new("appimagetool");
+        let appimagetool = which::which("appimagetool")
+            .or(Err(failure::format_err!("appimagetool not found")))?;
+        let mut cmd = Command::new(appimagetool);
         cmd.current_dir(&build_dir).arg("appimage");
         if sign {
             cmd.arg("--sign");
