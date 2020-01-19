@@ -1,5 +1,5 @@
 use crate::cargo::Cargo;
-use crate::engine::Build;
+use crate::engine::{Build, Engine};
 use crate::error::Error;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -29,6 +29,10 @@ impl Flutter {
         &self.root
     }
 
+    pub fn flutter(&self) -> Result<PathBuf, Error> {
+        which::which("flutter").or(Err(Error::FlutterNotFound))
+    }
+
     pub fn engine_version(&self) -> Result<String, Error> {
         let path = self
             .root
@@ -38,15 +42,13 @@ impl Flutter {
         Ok(std::fs::read_to_string(path).map(|v| v.trim().to_owned())?)
     }
 
-    pub fn bundle(&self, cargo: &Cargo, build: Build) -> Result<(), Error> {
+    pub fn bundle(&self, cargo: &Cargo, build: Build, dart_main: &Path) -> Result<(), Error> {
         let flag = match build {
             Build::Debug => "--debug",
             Build::Release => "--release",
             Build::Profile => "--profile",
         };
-
-        let flutter = which::which("flutter").or(Err(Error::FlutterNotFound))?;
-        let status = Command::new(flutter)
+        let status = Command::new(self.flutter()?)
             .current_dir(cargo.workspace().root())
             .arg("build")
             .arg("bundle")
@@ -56,6 +58,8 @@ impl Flutter {
             .arg(cargo.build_dir().join("flutter_assets"))
             .arg("--depfile")
             .arg(cargo.build_dir().join("snapshot_blob.bin.d"))
+            .arg("--target")
+            .arg(dart_main)
             .status()
             .expect("flutter build bundle");
         if status.code() != Some(0) {
@@ -65,14 +69,11 @@ impl Flutter {
     }
 
     pub fn attach(&self, cargo: &Cargo, debug_uri: &str) -> Result<(), Error> {
-        let debug_uri = format!("--debug-uri={}", debug_uri);
-
-        let flutter = which::which("flutter").or(Err(Error::FlutterNotFound))?;
-        let status = Command::new(flutter)
+        let status = Command::new(self.flutter()?)
             .current_dir(cargo.workspace().root())
             .arg("attach")
             .arg("--device-id=flutter-tester")
-            .arg(debug_uri)
+            .arg(format!("--debug-uri={}", debug_uri))
             .status()
             .expect("Success");
         if status.code() != Some(0) {
@@ -84,22 +85,16 @@ impl Flutter {
     pub fn aot(
         &self,
         cargo: &Cargo,
-        host_engine_path: &Path,
-        target_engine_path: &Path,
+        host_engine: &Engine,
+        target_engine: &Engine,
     ) -> Result<(), Error> {
         let root = cargo.workspace().root();
         let build_dir = cargo.build_dir();
-        let host_engine_dir = host_engine_path.parent().unwrap();
-        let target_engine_dir = target_engine_path.parent().unwrap();
+        let host_engine_dir = host_engine.engine_dir();
+        let target_engine_dir = target_engine.engine_dir();
         let snapshot = build_dir.join("kernel_snapshot.dill");
 
-        let dart = ["dart", "dart.exe"]
-            .iter()
-            .map(|bin| host_engine_dir.join(bin))
-            .find(|path| path.exists())
-            .ok_or(Error::DartNotFound)?;
-
-        let status = Command::new(dart)
+        let status = Command::new(host_engine.dart()?)
             .current_dir(root)
             .arg(
                 host_engine_dir
@@ -151,6 +146,30 @@ impl Flutter {
             return Err(Error::FlutterError);
         }
 
+        Ok(())
+    }
+
+    pub fn drive(
+        &self,
+        host_engine: &Engine,
+        cargo: &Cargo,
+        debug_uri: &str,
+        dart_main: &Path,
+    ) -> Result<(), Error> {
+        let mut file = dart_main.file_stem().unwrap().to_owned();
+        file.push("_test.dart");
+        let driver = dart_main.parent().unwrap().join(file);
+
+        // used by flutter_driver
+        std::env::set_var("VM_SERVICE_URL", debug_uri);
+        let status = Command::new(host_engine.dart()?)
+            .current_dir(cargo.workspace().root())
+            .arg(driver)
+            .status()
+            .expect("Success");
+        if status.code() != Some(0) {
+            return Err(Error::FlutterError);
+        }
         Ok(())
     }
 }

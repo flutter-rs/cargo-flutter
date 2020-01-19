@@ -60,7 +60,7 @@ impl<'a> Cargo<'a> {
         self.args.iter().any(|f| *f == "--release")
     }
 
-    pub fn host_target(&self) -> Result<String, Error> {
+    pub fn host_triple(&self) -> Result<String, Error> {
         let rustc = self
             .workspace
             .config()
@@ -68,11 +68,11 @@ impl<'a> Cargo<'a> {
         Ok(rustc.host.as_str().to_string())
     }
 
-    pub fn triple(&self) -> Result<String, Error> {
+    pub fn target_triple(&self) -> Result<String, Error> {
         if let Some(target) = self.target() {
             Ok(target.to_string())
         } else {
-            self.host_target()
+            self.host_triple()
         }
     }
 

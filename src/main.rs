@@ -7,6 +7,7 @@ use cargo_flutter::{Build, Cargo, Engine, Error, Flutter, Item, Package, TomlCon
 use clap::{App, AppSettings, Arg, SubCommand};
 use exitfailure::ExitFailure;
 use rand::Rng;
+use std::path::PathBuf;
 use std::{env, str};
 
 fn main() -> Result<(), ExitFailure> {
@@ -46,6 +47,18 @@ fn main() -> Result<(), ExitFailure> {
                         .help("Skips creating aot blob"),
                 )
                 .arg(
+                    Arg::with_name("dart-main")
+                        .long("dart-main")
+                        .value_name("DART-MAIN")
+                        .takes_value(true)
+                        .help("Dart entrypoint (defaults to `lib/main.dart`)"),
+                )
+                .arg(
+                    Arg::with_name("drive")
+                        .long("drive")
+                        .help("Runs driver `${dart-main-dir}_test.dart`"),
+                )
+                .arg(
                     Arg::with_name("format")
                         .short("f")
                         .long("format")
@@ -79,6 +92,7 @@ fn main() -> Result<(), ExitFailure> {
         return Err(Error::NotCalledWithCargo.into());
     };
 
+    // Setup cargo
     let quiet = matches.is_present("quiet");
     let cargo_args: Vec<&str> = matches
         .values_of("cargo-args")
@@ -87,6 +101,7 @@ fn main() -> Result<(), ExitFailure> {
     let mut cargo_config = Config::default()?;
     let cargo = Cargo::new(&mut cargo_config, cargo_args)?;
 
+    // Parse options
     let build = if cargo.release() {
         Build::Release
     } else {
@@ -100,33 +115,46 @@ fn main() -> Result<(), ExitFailure> {
         .as_ref()
         .map(|config| config.metadata())
         .unwrap_or_default();
+
+    // Find flutter sdk
     let flutter = Flutter::new()?;
+    log::debug!("FLUTTER_ROOT {}", flutter.root().display());
+
+    // Find engine version used by the flutter sdk
     let engine_version = metadata.engine_version().unwrap_or_else(|| {
         std::env::var("FLUTTER_ENGINE_VERSION")
             .ok()
             .unwrap_or_else(|| flutter.engine_version().unwrap())
     });
-
-    log::debug!("FLUTTER_ROOT {}", flutter.root().display());
     log::debug!("FLUTTER_ENGINE_VERSION {}", engine_version);
 
-    let triple = cargo.triple()?;
-    let engine = Engine::new(engine_version.clone(), triple.clone(), build);
+    // Download host engine
+    let host_triple = cargo.host_triple()?;
+    let host_engine = Engine::new(engine_version.clone(), host_triple, build);
+    host_engine.download(quiet)?;
+
+    // Download target engine
+    let target_triple = cargo.target_triple()?;
+    let target_engine = Engine::new(engine_version, target_triple.clone(), build);
+    target_engine.download(quiet)?;
+
+    //
     let flutter_asset_dir = cargo.build_dir().join("flutter_assets");
     let snapshot_path = cargo.build_dir().join("app.so");
-    let engine_path = cargo.build_dir().join("deps").join(engine.library_name());
-
-    log::debug!("FLUTTER_ENGINE_PATH {}", engine.engine_path().display());
+    let engine_path = cargo
+        .build_dir()
+        .join("deps")
+        .join(target_engine.library_name());
+    let dart_main = PathBuf::from(matches.value_of("dart-main").unwrap_or("lib/main.dart"));
     log::debug!("FLUTTER_ASSET_DIR {}", flutter_asset_dir.display());
 
-    engine.download(quiet)?;
-
+    // Copy target engine to deps dir
     if !engine_path.exists() {
         std::fs::create_dir_all(engine_path.parent().unwrap())?;
-        std::fs::copy(engine.engine_path(), &engine_path)?;
+        std::fs::copy(target_engine.engine_path(), &engine_path)?;
 
-        if triple == "x86_64-pc-windows-msvc" {
-            let from_dir = engine.engine_path().parent().unwrap().to_owned();
+        if target_triple == "x86_64-pc-windows-msvc" {
+            let from_dir = target_engine.engine_path().parent().unwrap().to_owned();
             let to_dir = engine_path.parent().unwrap();
             for file in &[
                 "flutter_engine.dll.lib",
@@ -138,20 +166,15 @@ fn main() -> Result<(), ExitFailure> {
         }
     }
 
+    // Build flutter_assets and aot binary
     if config.is_some() {
         if !matches.is_present("no-flutter") && !matches.is_present("no-bundle") {
-            println!("flutter build bundle");
-            flutter.bundle(&cargo, build)?;
+            println!("flutter build bundle {}", dart_main.display());
+            flutter.bundle(&cargo, build, &dart_main)?;
         }
 
-        if !matches.is_present("no-flutter") && !matches.is_present("no-aot") {
-            let host_triple = cargo.host_target()?;
-            let host_engine = Engine::new(engine_version, host_triple, build);
-            host_engine.download(quiet)?;
-
-            if aot {
-                flutter.aot(&cargo, &host_engine.engine_path(), &engine.engine_path())?;
-            }
+        if !matches.is_present("no-flutter") && !matches.is_present("no-aot") && aot {
+            flutter.aot(&cargo, &host_engine, &target_engine)?;
         }
     }
 
@@ -164,7 +187,7 @@ fn main() -> Result<(), ExitFailure> {
             }
             package.add_asset(flutter_asset_dir);
 
-            if !triple.contains("android") {
+            if !target_triple.contains("android") {
                 cargo.exec()?;
                 package.add_bin(cargo.build_dir().join(&config.package.name));
 
@@ -183,7 +206,7 @@ fn main() -> Result<(), ExitFailure> {
             } else {
                 use lib_cargo_apk::config::AndroidBuildTarget;
                 let mut android_config = lib_cargo_apk::config::load(cargo.package()?).unwrap();
-                let target = match triple.as_str() {
+                let target = match target_triple.as_str() {
                     "armv7-linux-androideabi" => AndroidBuildTarget::ArmV7a,
                     "aarch64-linux-android" => AndroidBuildTarget::Arm64V8a,
                     "i686-linux-android" => AndroidBuildTarget::X86,
@@ -229,13 +252,16 @@ fn main() -> Result<(), ExitFailure> {
         ("run", Some(_config)) => {
             let mut rng = rand::thread_rng();
             let port = rng.gen_range(1024, 49152);
+            let observatory = format!("http://127.0.0.1:{}", port);
             std::env::set_var("FLUTTER_AOT_SNAPSHOT", &snapshot_path);
             std::env::set_var("FLUTTER_ASSET_DIR", &flutter_asset_dir);
             std::env::set_var("DART_OBSERVATORY_PORT", port.to_string());
             cargo.spawn()?;
 
-            if !matches.is_present("no-flutter") && !matches.is_present("no-attach") {
-                flutter.attach(&cargo, &format!("http://127.0.0.1:{}", port))?;
+            if matches.is_present("drive") {
+                flutter.drive(&host_engine, &cargo, &observatory, &dart_main)?;
+            } else if !matches.is_present("no-flutter") && !matches.is_present("no-attach") {
+                flutter.attach(&cargo, &observatory)?;
             }
         }
         _ => cargo.exec()?,

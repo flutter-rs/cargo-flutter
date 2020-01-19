@@ -73,18 +73,17 @@ impl Engine {
         }
     }
 
+    pub fn engine_dir(&self) -> PathBuf {
+        dirs::cache_dir()
+            .expect("Cannot get cache dir")
+            .join("flutter-engine")
+            .join(&self.version)
+            .join(&self.target)
+            .join(self.build.build())
+    }
+
     pub fn engine_path(&self) -> PathBuf {
-        if let Ok(path) = std::env::var("FLUTTER_ENGINE_PATH") {
-            PathBuf::from(path)
-        } else {
-            dirs::cache_dir()
-                .expect("Cannot get cache dir")
-                .join("flutter-engine")
-                .join(&self.version)
-                .join(&self.target)
-                .join(self.build.build())
-                .join(self.library_name())
-        }
+        self.engine_dir().join(self.library_name())
     }
 
     pub fn download(&self, quiet: bool) -> Result<(), ExitFailure> {
@@ -127,5 +126,14 @@ impl Engine {
         crate::unzip::unzip(&download_file, &dir)?;
 
         Ok(())
+    }
+
+    pub fn dart(&self) -> Result<PathBuf, Error> {
+        let host_engine_dir = self.engine_dir();
+        ["dart", "dart.exe"]
+            .iter()
+            .map(|bin| host_engine_dir.join(bin))
+            .find(|path| path.exists())
+            .ok_or(Error::DartNotFound)
     }
 }
