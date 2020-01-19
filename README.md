@@ -19,6 +19,10 @@ cargo install cargo-flutter
 
     `cargo flutter --format appimage build --release`
 
+- Run `flutter_driver` tests
+
+    `cargo flutter --dart-main test_driver/app.dart --drive run`
+
 ## Supported targets
 - x86_64-unknown-linux-gnu
 
