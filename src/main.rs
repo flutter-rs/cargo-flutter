@@ -157,9 +157,9 @@ fn main() -> Result<(), ExitFailure> {
             let from_dir = target_engine.engine_path().parent().unwrap().to_owned();
             let to_dir = engine_path.parent().unwrap();
             for file in &[
-                "flutter_engine.dll.lib",
-                "flutter_engine.dll.exp",
-                "flutter_engine.dll.pdb",
+                "flutter_engine.lib",
+                "flutter_engine.exp",
+                "flutter_engine.pdb",
             ] {
                 std::fs::copy(from_dir.join(file), to_dir.join(file))?;
             }
