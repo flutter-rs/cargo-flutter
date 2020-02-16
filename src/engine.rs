@@ -1,6 +1,5 @@
 use crate::error::Error;
 use curl::easy::Easy;
-use exitfailure::ExitFailure;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -13,10 +12,11 @@ pub struct Engine {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(u8)]
 pub enum Build {
-    Debug,
-    Release,
-    Profile,
+    Debug = 1,
+    Profile = 2,
+    Release = 3,
 }
 
 impl Build {
@@ -86,7 +86,7 @@ impl Engine {
         self.engine_dir().join(self.library_name())
     }
 
-    pub fn download(&self, quiet: bool) -> Result<(), ExitFailure> {
+    pub fn download(&self, quiet: bool) -> Result<(), Error> {
         let url = self.download_url();
         let path = self.engine_path();
         let dir = path.parent().unwrap().to_owned();

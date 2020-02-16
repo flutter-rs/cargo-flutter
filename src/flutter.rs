@@ -1,4 +1,3 @@
-use crate::cargo::Cargo;
 use crate::engine::{Build, Engine};
 use crate::error::Error;
 use std::path::{Path, PathBuf};
@@ -42,22 +41,28 @@ impl Flutter {
         Ok(std::fs::read_to_string(path).map(|v| v.trim().to_owned())?)
     }
 
-    pub fn bundle(&self, cargo: &Cargo, build: Build, dart_main: &Path) -> Result<(), Error> {
+    pub fn bundle(
+        &self,
+        root_dir: &Path,
+        out_dir: &Path,
+        build: Build,
+        dart_main: &Path,
+    ) -> Result<(), Error> {
         let flag = match build {
             Build::Debug => "--debug",
             Build::Release => "--release",
             Build::Profile => "--profile",
         };
         let status = Command::new(self.flutter()?)
-            .current_dir(cargo.workspace().root())
+            .current_dir(root_dir)
             .arg("build")
             .arg("bundle")
             .arg(flag)
             .arg("--track-widget-creation")
             .arg("--asset-dir")
-            .arg(cargo.build_dir().join("flutter_assets"))
+            .arg(out_dir.join("flutter_assets"))
             .arg("--depfile")
-            .arg(cargo.build_dir().join("snapshot_blob.bin.d"))
+            .arg(out_dir.join("snapshot_blob.bin.d"))
             .arg("--target")
             .arg(dart_main)
             .status()
@@ -68,9 +73,9 @@ impl Flutter {
         Ok(())
     }
 
-    pub fn attach(&self, cargo: &Cargo, debug_uri: &str) -> Result<(), Error> {
+    pub fn attach(&self, root_dir: &Path, debug_uri: &str) -> Result<(), Error> {
         let status = Command::new(self.flutter()?)
-            .current_dir(cargo.workspace().root())
+            .current_dir(root_dir)
             .arg("attach")
             .arg("--device-id=flutter-tester")
             .arg(format!("--debug-uri={}", debug_uri))
@@ -84,18 +89,17 @@ impl Flutter {
 
     pub fn aot(
         &self,
-        cargo: &Cargo,
+        root_dir: &Path,
+        build_dir: &Path,
         host_engine: &Engine,
         target_engine: &Engine,
     ) -> Result<(), Error> {
-        let root = cargo.workspace().root();
-        let build_dir = cargo.build_dir();
         let host_engine_dir = host_engine.engine_dir();
         let target_engine_dir = target_engine.engine_dir();
         let snapshot = build_dir.join("kernel_snapshot.dill");
 
         let status = Command::new(host_engine.dart()?)
-            .current_dir(root)
+            .current_dir(root_dir)
             .arg(
                 host_engine_dir
                     .join("gen")
@@ -111,7 +115,7 @@ impl Flutter {
             .arg(".packages")
             .arg("--output-dill")
             .arg(&snapshot)
-            .arg(root.join("lib").join("main.dart"))
+            .arg(root_dir.join("lib").join("main.dart"))
             .status()
             .expect("Success");
 
@@ -132,7 +136,7 @@ impl Flutter {
         .ok_or(Error::GenSnapshotNotFound)?;
 
         let status = Command::new(gen_snapshot)
-            .current_dir(root)
+            .current_dir(root_dir)
             .arg("--causal_async_stacks")
             .arg("--deterministic")
             .arg("--snapshot_kind=app-aot-elf")
@@ -152,7 +156,7 @@ impl Flutter {
     pub fn drive(
         &self,
         host_engine: &Engine,
-        cargo: &Cargo,
+        root_dir: &Path,
         debug_uri: &str,
         dart_main: &Path,
     ) -> Result<(), Error> {
@@ -163,7 +167,7 @@ impl Flutter {
         // used by flutter_driver
         std::env::set_var("VM_SERVICE_URL", debug_uri);
         let status = Command::new(host_engine.dart()?)
-            .current_dir(cargo.workspace().root())
+            .current_dir(root_dir)
             .arg(driver)
             .status()
             .expect("Success");

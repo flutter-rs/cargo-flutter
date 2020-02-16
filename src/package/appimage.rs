@@ -1,6 +1,5 @@
-use crate::cargo::Cargo;
+use crate::error::Error;
 use crate::package::Package;
-use failure::Error;
 use serde::Deserialize;
 use std::fs::Permissions;
 #[cfg(unix)]
@@ -16,22 +15,22 @@ pub struct TomlAppImage {
 
 pub struct AppImage {
     toml: TomlAppImage,
+    sign: bool,
 }
 
 impl AppImage {
-    pub fn new(toml: TomlAppImage) -> Self {
-        Self { toml }
+    pub fn new(toml: TomlAppImage, sign: bool) -> Self {
+        Self { toml, sign }
     }
 
     #[cfg(not(unix))]
-    pub fn build(&self, cargo: &Cargo, package: &Package, sign: bool) -> Result<(), Error> {
+    pub fn build(&self, _package: &Package) -> Result<(), Error> {
         Err(failure::format_err!("Creating appimages only supported from a unix host.").into())
     }
 
     #[cfg(unix)]
-    pub fn build(&self, cargo: &Cargo, package: &Package, sign: bool) -> Result<(), Error> {
-        let build_dir = cargo.build_dir();
-        let appimage_dir = build_dir.join("appimage");
+    pub fn build(&self, package: &Package) -> Result<(), Error> {
+        let appimage_dir = package.out_dir().join("appimage");
         let name = self.toml.name.as_ref().unwrap_or(&package.name);
         let exec = &package.name;
         let icon_path = self
@@ -39,12 +38,9 @@ impl AppImage {
             .icon
             .as_ref()
             .map(PathBuf::from)
-            .unwrap_or_else(|| cargo.workspace().root().join("assets").join("icon.svg"));
+            .unwrap_or_else(|| package.root_dir().join("assets").join("icon.svg"));
         if !icon_path.exists() {
-            return Err(failure::format_err!(
-                "Icon not found {}",
-                icon_path.display()
-            ));
+            return Err(failure::format_err!("Icon not found {}", icon_path.display()).into());
         }
         let icon = icon_path
             .file_stem()
@@ -87,8 +83,8 @@ impl AppImage {
         let appimagetool = which::which("appimagetool")
             .or_else(|_| Err(failure::format_err!("appimagetool not found")))?;
         let mut cmd = Command::new(appimagetool);
-        cmd.current_dir(&build_dir).arg("appimage");
-        if sign {
+        cmd.current_dir(package.out_dir()).arg("appimage");
+        if self.sign {
             cmd.arg("--sign");
         }
         cmd.status().expect("Success");

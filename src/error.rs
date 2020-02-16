@@ -1,3 +1,13 @@
+use android_build_tools::error::NdkError;
+use cargo_subcommand::Error as SubcommandError;
+use curl::Error as CurlError;
+use failure::Error as Failure;
+use std::fmt::{Display, Formatter, Result};
+use std::io::Error as IoError;
+use std::str::Utf8Error;
+use toml::de::Error as TomlError;
+use which::Error as WhichError;
+
 #[derive(Debug)]
 pub enum Error {
     PackageNotMember,
@@ -9,15 +19,18 @@ pub enum Error {
     CargoError,
     FlutterError,
     NotCalledWithCargo,
-    Which(which::Error),
-    Io(std::io::Error),
-    Toml(toml::de::Error),
-    Utf8(std::str::Utf8Error),
-    Err(failure::Error),
+    Which(WhichError),
+    Io(IoError),
+    Toml(TomlError),
+    Utf8(Utf8Error),
+    Curl(CurlError),
+    Err(Failure),
+    Ndk(NdkError),
+    Subcommand(SubcommandError),
 }
 
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
             Error::PackageNotMember => write!(f, "Package is not a member of the workspace"),
             Error::FlutterNotFound => write!(f, "Couldn't find flutter sdk"),
@@ -57,39 +70,60 @@ You'll find the available builds on our github releases page [0].
             Error::Io(error) => error.fmt(f),
             Error::Toml(error) => error.fmt(f),
             Error::Utf8(error) => error.fmt(f),
+            Error::Curl(error) => error.fmt(f),
             Error::Err(error) => error.fmt(f),
+            Error::Ndk(error) => error.fmt(f),
+            Error::Subcommand(error) => error.fmt(f),
         }
     }
 }
 
 impl std::error::Error for Error {}
 
-impl From<which::Error> for Error {
-    fn from(error: which::Error) -> Self {
+impl From<WhichError> for Error {
+    fn from(error: WhichError) -> Self {
         Error::Which(error)
     }
 }
 
-impl From<std::io::Error> for Error {
-    fn from(error: std::io::Error) -> Self {
+impl From<IoError> for Error {
+    fn from(error: IoError) -> Self {
         Error::Io(error)
     }
 }
 
-impl From<toml::de::Error> for Error {
-    fn from(error: toml::de::Error) -> Self {
+impl From<TomlError> for Error {
+    fn from(error: TomlError) -> Self {
         Error::Toml(error)
     }
 }
 
-impl From<std::str::Utf8Error> for Error {
-    fn from(error: std::str::Utf8Error) -> Self {
+impl From<Utf8Error> for Error {
+    fn from(error: Utf8Error) -> Self {
         Error::Utf8(error)
     }
 }
 
-impl From<failure::Error> for Error {
-    fn from(error: failure::Error) -> Self {
+impl From<CurlError> for Error {
+    fn from(error: CurlError) -> Self {
+        Error::Curl(error)
+    }
+}
+
+impl From<Failure> for Error {
+    fn from(error: Failure) -> Self {
         Error::Err(error)
+    }
+}
+
+impl From<NdkError> for Error {
+    fn from(error: NdkError) -> Self {
+        Error::Ndk(error)
+    }
+}
+
+impl From<SubcommandError> for Error {
+    fn from(error: SubcommandError) -> Self {
+        Error::Subcommand(error)
     }
 }
